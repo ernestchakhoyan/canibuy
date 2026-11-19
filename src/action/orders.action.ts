@@ -27,13 +27,14 @@ const validOrder = (o: Order) =>
     (Number.isInteger(o.loanTermMonths) && o.loanTermMonths >= 1 && o.loanTermMonths <= 600));
 
 /** Mirrors the app's orders into the sheet's Orders tab. No sheet connected → nothing to do. */
+/** Returns `true` once written, `false` when no sheet is connected. */
 export async function saveOrders(orders: Order[]) {
   if (!Array.isArray(orders) || orders.length > MAX_ORDERS || !orders.every(validOrder)) {
     throw new Error("Invalid orders");
   }
   const spreadsheetId = (await auth())?.sheet?.id;
   const accessToken = spreadsheetId && (await googleAccessToken());
-  if (!spreadsheetId || !accessToken) return;
+  if (!spreadsheetId || !accessToken) return false; // nothing written: the caller must not count it as synced
   // Rebuild each order from known fields only, so nothing extra rides along into the sheet.
   await writeOrders(
     accessToken,
@@ -51,4 +52,5 @@ export async function saveOrders(orders: Order[]) {
       loanTermMonths: loanTermMonths ?? null,
     }))
   );
+  return true;
 }

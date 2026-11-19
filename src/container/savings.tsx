@@ -5,7 +5,6 @@ import { budgetActions, useLoadedBudget } from "@store";
 import {
   Button,
   Card,
-  EntryRow,
   Field,
   FieldError,
   FieldGroup,
@@ -110,28 +109,6 @@ export function SavingsForm({ onDone }: { onDone?: () => void }) {
           </Button>
         </FieldGroup>
       </form>
-    </Card>
-  );
-}
-
-export function SavingsHistory() {
-  const t = useTranslations("savings");
-  const locale = useLocale();
-  const b = useLoadedBudget();
-  const money = (n: number) => formatMoney(n, b.settings.currency, locale);
-  const moves = b.entries
-    .filter((e) => e.type === "saving" || e.type === "withdrawal")
-    .sort((a, z) => z.date.localeCompare(a.date) || z.createdAt.localeCompare(a.createdAt));
-
-  return (
-    <Card title={t("historyTitle")} description={t("opening", { amount: money(b.settings.openingSavings) })}>
-      {moves.length > 0 && (
-        <ul className="divide-y">
-          {moves.map((e) => (
-            <EntryRow key={e.id} entry={e} money={money} onDelete={() => budgetActions.removeEntry(e.id)} />
-          ))}
-        </ul>
-      )}
     </Card>
   );
 }

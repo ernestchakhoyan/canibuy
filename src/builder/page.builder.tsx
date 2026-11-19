@@ -4,7 +4,6 @@ import {
   CategoriesEditor,
   ConnectSheet,
   ConnectStatus,
-  ExpenseForm,
   History,
   IncomeForm,
   IncomeList,
@@ -16,7 +15,6 @@ import {
   ProjectDetails,
   ProjectList,
   SavingsForm,
-  SavingsHistory,
   SavingsOverview,
   SettingsForm,
 } from "@container";
@@ -64,7 +62,6 @@ const Page = ({ title, children }: { title: PageKey; children: ReactNode }) => (
 export const MonthBuilder = () => (
   <Page title="month">
     <MonthOverview />
-    <ExpenseForm />
     <MonthExpenses />
   </Page>
 );
@@ -80,7 +77,6 @@ export const SavingsBuilder = () => (
   <Page title="savings">
     <SavingsOverview />
     <SavingsForm />
-    <SavingsHistory />
   </Page>
 );
 

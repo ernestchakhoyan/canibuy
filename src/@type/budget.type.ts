@@ -14,7 +14,12 @@ export type AppMode = "system" | "light" | "dark";
 export type Locale = "en" | "hy" | "ru";
 
 /** Per-person preferences: the "Personal" block of the sheet's Setup tab. */
-export type Personal = { appMode: AppMode; locale: Locale };
+export type Personal = {
+  appMode: AppMode;
+  locale: Locale;
+  /** The eye toggle: money amounts masked as "֏ ••••" on This month and Setup. Missing (older data) = hidden. */
+  amountsHidden?: boolean;
+};
 
 export type Bill = {
   id: string;

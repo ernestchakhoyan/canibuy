@@ -73,9 +73,7 @@
     "add": "Add to savings",
     "take": "Take out",
     "errorAmount": "Enter an amount above 0",
-    "errorBalance": "You can't take more than your balance",
-    "historyTitle": "Savings history",
-    "opening": "Opening savings: {amount}"
+    "errorBalance": "You can't take more than your balance"
   },
   "history": {
     "period": "Period",

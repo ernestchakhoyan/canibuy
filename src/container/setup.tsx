@@ -45,7 +45,7 @@ export function SettingsForm() {
   const t = useTranslations("setup");
   const b = useLoadedBudget();
   const [saved, setSaved] = useState(false);
-  const [moneyHidden, setMoneyHidden] = useState(true); // hidden on every visit, not remembered
+  const moneyHidden = b.personal.amountsHidden ?? true; // the eye: a Personal setting, synced with the sheet
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -60,9 +60,15 @@ export function SettingsForm() {
   return (
     <Card
       title={t("settings.title")}
-      action={<AmountsToggle hidden={moneyHidden} onToggle={() => setMoneyHidden(!moneyHidden)} />}
+      action={
+        <AmountsToggle
+          hidden={moneyHidden}
+          onToggle={() => budgetActions.updatePersonal({ amountsHidden: !moneyHidden })}
+        />
+      }
     >
-      <form onSubmit={submit} onChange={() => setSaved(false)}>
+      {/* key: the inputs are uncontrolled; re-mount when the settings change underneath (read back from the sheet). */}
+      <form key={JSON.stringify(b.settings)} onSubmit={submit} onChange={() => setSaved(false)}>
         <FieldGroup className="grid grid-cols-2 items-end gap-4">
           <Field>
             <FieldLabel htmlFor="setup-currency">{t("settings.currency")}</FieldLabel>
@@ -98,7 +104,7 @@ export function SettingsForm() {
                     value={maskedMoney(b.settings.currency)}
                     aria-description={t("settings.amountHidden")}
                     className="cursor-pointer text-muted-foreground"
-                    onClick={() => setMoneyHidden(false)}
+                    onClick={() => budgetActions.updatePersonal({ amountsHidden: false })}
                   />
                 )}
               </Field>

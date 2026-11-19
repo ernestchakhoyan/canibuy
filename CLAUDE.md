@@ -36,8 +36,12 @@ Data flows one way: `src/app/[locale]/<route>/page.tsx` → builder (`@builder`)
   `useBudget()` is `null` on the server and during hydration; `BudgetGate` renders children only after it loads, so
   containers use `useLoadedBudget()` and never handle `null`. All writes go through `budgetActions`. This is the
   stand-in for Google Sheets (M1/M2); the `Budget` shape in `src/@type/budget.type.ts` mirrors the sheet tabs.
-  Already mirrored to the sheet (write-only, through validated server actions in `@action`): the Orders tab (the store
-  rewrites it after every orders change) and the Setup tab's Personal block. Nothing is read back from the sheet yet.
+  Two-way sync with the sheet for Orders, Projects, Bills (own tab since template v2), entries (month tabs) and Setup, via
+  validated server actions in `@action`; the rules live in `src/helper/sheet-sync.ts`. The sheet leads: once per
+  session the store writes "dirty" tabs (local changes not yet in the sheet, tracked in `localStorage` across
+  reloads), then reads the sheet back into every clean tab. Columns are found by header name. Setup's settings (A–B,
+  merged key by key), categories (K–L) and the Personal block (N–O: appearance, language, the amounts eye) sync too.
+  A language read back from the sheet that differs from the one on screen sets the locale cookie and reloads once.
 - **Engine** (`src/helper/engine.ts`): pure functions implementing PRD section 7. Nothing calculated is stored —
   everything is derived from raw entries on each render.
 - **Auth (M1):** Auth.js v5 in `src/server/auth.ts`, Google REST calls over `fetch` in `src/server/google.ts`, server

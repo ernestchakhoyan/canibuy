@@ -1,7 +1,7 @@
 "use client";
 
 import { formatMoney, monthSummary, savingsBalance, todayISO } from "@helper";
-import { useLoadedBudget } from "@store";
+import { budgetActions, useLoadedBudget } from "@store";
 import {
   Alert,
   AlertDescription,
@@ -16,13 +16,12 @@ import {
 import { SparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
 
 export function MonthOverview() {
   const t = useTranslations("month");
   const locale = useLocale();
   const b = useLoadedBudget();
-  const [hidden, setHidden] = useState(true); // hidden on every visit, not remembered
+  const hidden = b.personal.amountsHidden ?? true; // the eye: a Personal setting, synced with the sheet
   const money = (n: number) =>
     hidden ? maskedMoney(b.settings.currency) : formatMoney(Math.round(n), b.settings.currency, locale);
   // Red / green would give away the sign of a hidden amount.
@@ -56,7 +55,7 @@ export function MonthOverview() {
           </div>
           <AmountsToggle
             hidden={hidden}
-            onToggle={() => setHidden(!hidden)}
+            onToggle={() => budgetActions.updatePersonal({ amountsHidden: !hidden })}
             className="-mt-1 -mr-2 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
           />
         </div>

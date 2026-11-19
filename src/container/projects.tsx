@@ -19,7 +19,7 @@ import {
   todayISO,
 } from "@helper";
 import { Link, useRouter } from "@i18n";
-import { budgetActions, useLoadedBudget } from "@store";
+import { budgetActions, useLoadedBudget, useSheetSyncFailed } from "@store";
 import type { ProjectPart } from "@type";
 import {
   Badge,
@@ -372,6 +372,8 @@ export function ProjectList() {
   const t = useTranslations("projects");
   const b = useLoadedBudget();
   const router = useRouter();
+  const tc = useTranslations("common");
+  const syncFailed = useSheetSyncFailed("projects");
   const [creating, setCreating] = useState(false);
   const today = todayISO();
   const summaries = projectsOf(b).map((p) => projectSummary(b, p, today));
@@ -398,6 +400,7 @@ export function ProjectList() {
             <PlusIcon />
           </Button>
         </div>
+        {syncFailed && <p className="text-sm text-destructive">{tc("syncFailed")}</p>}
         {TABS.map((tab) => (
           <TabsContent key={tab} value={tab} className="flex flex-col gap-3">
             {inTab(tab).length > 0 ? (

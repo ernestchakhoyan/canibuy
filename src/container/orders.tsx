@@ -1,7 +1,7 @@
 "use client";
 
 import { cn, formatMoney, orderVerdict, parseAmount, savedToward, todayISO, type Verdict } from "@helper";
-import { budgetActions, useLoadedBudget, useOrdersSyncFailed } from "@store";
+import { budgetActions, useLoadedBudget, useSheetSyncFailed } from "@store";
 import type { Order } from "@type";
 import {
   Badge,
@@ -206,7 +206,7 @@ export function OrderList() {
   const t = useTranslations("orders");
   const tc = useTranslations("common");
   const b = useLoadedBudget();
-  const syncFailed = useOrdersSyncFailed();
+  const syncFailed = useSheetSyncFailed("orders");
   const newestFirst = (a: Order, z: Order) => z.created.localeCompare(a.created);
   const tabs = [
     // Saving before Planned: money is already going toward those.

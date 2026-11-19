@@ -14,7 +14,7 @@ export const defaultBudget = (): Budget => {
       loanTermMonths: 12,
       startMonth: month,
     },
-    personal: { appMode: "system", locale: "en" },
+    personal: { appMode: "system", locale: "en", amountsHidden: true },
     bills: [],
     categories: ["Food", "Transport", "Home", "Utilities", "Health", "Fun", "Other"].map((name) => ({
       name,

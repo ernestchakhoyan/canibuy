@@ -1,9 +1,9 @@
 "use client";
 
-import { savePersonal } from "@action";
+import { setLocaleCookie } from "@helper";
 import { LOCALE_NAMES, routing } from "@i18n";
-import { budgetActions, useLoadedBudget } from "@store";
-import type { AppMode, Locale, Personal } from "@type";
+import { budgetActions, useLoadedBudget, useSheetSyncFailed } from "@store";
+import type { AppMode, Locale } from "@type";
 import {
   Card,
   Field,
@@ -20,7 +20,6 @@ import {
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
 
 /** Flag + native name; the flag is decorative, the name says which language it is. */
 const LocaleLabel = ({ locale }: { locale: Locale }) => (
@@ -36,27 +35,18 @@ const MODES = [
   { value: "dark", icon: MoonIcon },
 ] as const;
 
-/** Appearance and language. Both apply at once, on this device and in the "Personal" block of the sheet. */
+/** Appearance and language. Both apply at once; the store syncs them with the sheet's "Personal" block. */
 export function PersonalForm() {
   const t = useTranslations("personal");
   const tc = useTranslations("common");
   const b = useLoadedBudget();
   const locale = useLocale(); // what's on screen, from the cookie; may differ from the budget on a new device
-  const [syncFailed, setSyncFailed] = useState(false);
+  const syncFailed = useSheetSyncFailed("personal"); // the store writes changes to the sheet (Personal block)
 
-  /** Local first (instant), then the sheet. A failed sheet write keeps the local value and says so. */
-  const save = (change: Partial<Personal>) => {
-    budgetActions.updatePersonal(change);
-    setSyncFailed(false);
-    // ponytail: each call writes the whole block; rapid toggles can land out of order (last response wins).
-    return savePersonal({ ...b.personal, ...change }).catch(() => setSyncFailed(true));
-  };
-
-  const changeLocale = async (next: Locale) => {
-    await save({ locale: next }); // before the reload, which would cancel the request
-    // The proxy reads this cookie on the next request and serves that locale's pages.
-    // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API is missing on older iOS Safari
-    document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+  const changeLocale = (next: Locale) => {
+    // Saved and marked unsynced before the reload; if the reload cuts the sheet write short, it's redone on load.
+    budgetActions.updatePersonal({ locale: next });
+    setLocaleCookie(next); // the proxy serves this locale's pages from the next request
     location.reload();
   };
 
@@ -70,7 +60,7 @@ export function PersonalForm() {
             variant="outline"
             className="grid w-full grid-cols-3"
             value={[b.personal.appMode]}
-            onValueChange={(v) => v[0] && save({ appMode: v[0] as AppMode })}
+            onValueChange={(v) => v[0] && budgetActions.updatePersonal({ appMode: v[0] as AppMode })}
           >
             {MODES.map(({ value, icon: Icon }) => (
               <ToggleGroupItem key={value} value={value}>

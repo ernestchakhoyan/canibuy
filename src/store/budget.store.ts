@@ -1,14 +1,21 @@
-import { saveOrders } from "@action";
+import { loadSheet, saveBills, saveEntries, saveOrders, savePersonal, saveProjects, saveSetup } from "@action";
 import {
   defaultBudget,
   fromSavings,
+  INITIAL_SYNC_META,
+  mergeFromSheet,
   newId,
   type PaySource,
   paymentSplit,
   projectStart,
   projectStarted,
   projectsOf,
+  SHEET_TABS,
+  type SheetTab,
   BUDGET_STORAGE_KEY as STORAGE_KEY,
+  type SyncMeta,
+  setLocaleCookie,
+  tabsToWrite,
   todayISO,
 } from "@helper";
 import type { Bill, Budget, Entry, Order, OrderStatus, Personal, Project, ProjectPart, Settings } from "@type";
@@ -30,38 +37,114 @@ const load = (): Budget => {
 };
 
 const getBudget = () => {
-  state ??= load();
+  if (!state) {
+    state = load();
+    queueMicrotask(startSession); // first read in the browser
+  }
   return state;
 };
 
-/**
- * Orders mirror into the sheet's Orders tab after every change. One write at a time, each sending the orders as they
- * are when it starts, so quick changes can't land out of order and the last write always matches the app.
- */
-let ordersSyncFailed = false;
-let ordersSync: Promise<void> = Promise.resolve();
-const syncOrders = () => {
-  ordersSync = ordersSync.then(() =>
-    saveOrders(getBudget().orders).then(
-      () => setOrdersSyncFailed(false),
-      () => setOrdersSyncFailed(true)
+const persist = () => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
+  for (const listener of listeners) listener();
+};
+
+// ── Google Sheet sync ────────────────────────────────────────────────────────────────────────────────────────
+// The sheet is the source of truth. Every change is written to its tab (one write at a time per tab, each sending
+// the data as it is when it starts, so the last write always matches the app). A changed tab stays "dirty", even
+// across reloads, until a write of that exact version succeeds. Once per session the dirty tabs are written, then
+// the sheet is read back and replaces every tab that's still clean: rows deleted in the sheet disappear here too,
+// and changes the sheet doesn't have yet are never overwritten.
+
+const TABS = SHEET_TABS;
+
+const changed: Record<SheetTab, (a: Budget, z: Budget) => boolean> = {
+  orders: (a, z) => a.orders !== z.orders,
+  projects: (a, z) => a.parts !== z.parts || a.projects !== z.projects,
+  bills: (a, z) => a.bills !== z.bills,
+  entries: (a, z) => a.entries !== z.entries,
+  setup: (a, z) => a.settings !== z.settings || a.categories !== z.categories,
+  personal: (a, z) => a.personal !== z.personal,
+};
+/** Resolves `true` once written, `false` when no sheet is connected (then it stays dirty). */
+const send: Record<SheetTab, () => Promise<boolean>> = {
+  orders: () => saveOrders(getBudget().orders),
+  projects: () => {
+    const b = getBudget();
+    return saveProjects(projectsOf(b), b.parts);
+  },
+  bills: () => saveBills(getBudget().bills),
+  entries: () => saveEntries(getBudget().entries),
+  setup: () => saveSetup(getBudget().settings, getBudget().categories),
+  personal: () => savePersonal(getBudget().personal),
+};
+
+const SYNC_KEY = `${STORAGE_KEY}:sync`;
+const readMeta = (): SyncMeta => {
+  try {
+    const saved = localStorage.getItem(SYNC_KEY);
+    if (saved) return { ...INITIAL_SYNC_META, ...(JSON.parse(saved) as Partial<SyncMeta>) };
+  } catch {}
+  return INITIAL_SYNC_META;
+};
+const writeMeta = (change: (m: SyncMeta) => SyncMeta) => {
+  try {
+    localStorage.setItem(SYNC_KEY, JSON.stringify(change(readMeta())));
+  } catch {}
+};
+const setDirty = (tab: SheetTab, dirty: boolean) =>
+  writeMeta((m) => ({ ...m, dirty: dirty ? [...new Set([...m.dirty, tab])] : m.dirty.filter((t) => t !== tab) }));
+
+const sheetSync = Object.fromEntries(
+  TABS.map((tab) => [tab, { queue: Promise.resolve(), failed: false, version: 0 }])
+) as Record<SheetTab, { queue: Promise<void>; failed: boolean; version: number }>;
+
+const setSyncFailed = (tab: SheetTab, failed: boolean) => {
+  if (sheetSync[tab].failed === failed) return;
+  sheetSync[tab].failed = failed;
+  for (const listener of listeners) listener();
+};
+
+/** Queues a write of `tab`; it's clean again only if no newer change came in meanwhile. */
+const syncTab = (tab: SheetTab) => {
+  const sync = sheetSync[tab];
+  const version = ++sync.version;
+  setDirty(tab, true);
+  sync.queue = sync.queue.then(() =>
+    send[tab]().then(
+      (written) => {
+        if (written && sync.version === version) setDirty(tab, false);
+        setSyncFailed(tab, false);
+      },
+      () => setSyncFailed(tab, true)
     )
   );
+  return sync.queue;
 };
-const setOrdersSyncFailed = (failed: boolean) => {
-  if (ordersSyncFailed === failed) return;
-  ordersSyncFailed = failed;
-  for (const listener of listeners) listener();
+
+/** Once per session: write what the sheet is missing, then read the sheet back into every clean tab. */
+const startSession = async () => {
+  await Promise.all(tabsToWrite(getBudget(), readMeta()).map(syncTab));
+  const data = await loadSheet().catch(() => null);
+  if (!data) return; // not connected, or Google failed: keep what this device has
+  // Re-read `dirty`: anything changed while the sheet was being read stays as it is here.
+  state = mergeFromSheet(getBudget(), data, readMeta().dirty);
+  persist();
+  writeMeta((m) => ({ ...m, uploaded: SHEET_TABS })); // from now on the sheet leads for every tab
+  // The language from the sheet differs from the one on screen: switch (the server renders pages per locale).
+  if (state.personal.locale !== document.documentElement.lang) {
+    setLocaleCookie(state.personal.locale);
+    location.reload();
+  }
 };
 
 const update = (change: (b: Budget) => Budget) => {
   const before = getBudget();
   state = change(before);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
-  for (const listener of listeners) listener();
-  if (state.orders !== before.orders) syncOrders();
+  persist();
+  for (const tab of TABS) if (changed[tab](before, state)) syncTab(tab);
 };
 
 const subscribe = (listener: () => void) => {
@@ -69,11 +152,11 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
-/** True when the last attempt to mirror orders into the sheet failed (they're still saved on this device). */
-export const useOrdersSyncFailed = () =>
+/** True when the last attempt to mirror `tab` into the sheet failed (the data is still saved on this device). */
+export const useSheetSyncFailed = (tab: SheetTab) =>
   useSyncExternalStore(
     subscribe,
-    () => ordersSyncFailed,
+    () => sheetSync[tab].failed,
     () => false
   );
 

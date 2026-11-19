@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import type { Budget } from "@type";
 import { periodRange } from "./date";
+import { defaultBudget } from "./default-budget";
 import {
   affordOptions,
   loanPayment,
@@ -20,6 +21,7 @@ import {
   usableSavings,
 } from "./engine";
 import { parseAmount } from "./money";
+import { INITIAL_SYNC_META, mergeFromSheet, SHEET_TABS, tabsToWrite } from "./sheet-sync";
 
 const budget: Budget = {
   settings: {
@@ -306,5 +308,50 @@ assert.equal(plan.affordableMonth, "2027-02"); // 1200 + 3 × 600 ≥ 3000
 
 assert.deepEqual(periodRange("week", "2026-11-18"), ["2026-11-16", "2026-11-22"]);
 assert.deepEqual(periodRange("month", "2026-02-10"), ["2026-02-01", "2026-02-28"]);
+
+// Sheet sync rules: a new device never uploads empty tabs; dirty tabs are written and never overwritten.
+const local = {
+  ...budget,
+  orders: [
+    {
+      id: "o",
+      item: "TV",
+      price: 1,
+      deadlineMonths: null,
+      status: "Planned" as const,
+      created: "",
+      boughtDate: "",
+      note: "",
+    },
+  ],
+};
+// First run after the update: orders were already synced (the sheet leads, deleted rows stay deleted); bills and
+// entries were never uploaded, so this device's ones go up once.
+assert.deepEqual(tabsToWrite(local, INITIAL_SYNC_META), ["bills", "entries", "setup"]);
+assert.deepEqual(tabsToWrite(defaultBudget(), INITIAL_SYNC_META), ["setup"]); // fresh device: only its settings, once
+assert.deepEqual(tabsToWrite(local, { uploaded: SHEET_TABS, dirty: ["bills"] }), ["bills"]); // later: only what changed
+assert.deepEqual(tabsToWrite(local, { uploaded: SHEET_TABS, dirty: ["orders"] }), ["orders"]);
+const fromSheet = {
+  orders: [],
+  projects: [],
+  parts: [],
+  bills: [],
+  entries: [],
+  settings: { usualIncome: 4000 },
+  categories: [{ name: "Rent", monthlyLimit: 0 }],
+  personal: { appMode: "dark" as const, amountsHidden: false },
+};
+const merged = mergeFromSheet(local, fromSheet, ["orders"]);
+assert.equal(merged.orders.length, 1); // dirty: kept
+assert.equal(merged.entries.length, 0); // clean: the sheet wins (rows deleted there go away here)
+assert.deepEqual(merged.settings, { ...local.settings, usualIncome: 4000 }); // merged key by key
+assert.deepEqual(merged.categories, [{ name: "Rent", monthlyLimit: 0 }]);
+assert.deepEqual(
+  mergeFromSheet(local, { ...fromSheet, settings: null, categories: null, personal: null }, []).categories,
+  local.categories
+); // no block: keep
+assert.equal(mergeFromSheet(local, fromSheet, ["setup"]).settings, local.settings); // dirty: kept
+assert.deepEqual(merged.personal, { ...local.personal, appMode: "dark", amountsHidden: false }); // key by key: locale kept
+assert.equal(mergeFromSheet(local, fromSheet, ["personal"]).personal, local.personal); // dirty: kept
 
 console.log("engine: all checks passed");
