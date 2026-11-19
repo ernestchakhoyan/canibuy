@@ -1,10 +1,37 @@
 "use client";
 
-import { addMonths, formatMoney, monthLabel, monthOf, parseAmount, projectPlan, todayISO } from "@helper";
+import { addMonths, cn, formatMoney, monthLabel, monthOf, parseAmount, projectPlan, todayISO } from "@helper";
 import { budgetActions, useLoadedBudget } from "@store";
 import type { ProjectPart } from "@type";
-import { Card } from "@widget";
-import { type FormEvent, useState } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  NativeSelect,
+  NativeSelectOption,
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@widget";
+import { CheckCircle2Icon, HammerIcon, LandmarkIcon, PlusIcon, XIcon } from "lucide-react";
+import { type FormEvent, useId, useState } from "react";
 
 const MONTHS_AHEAD = 24;
 const monthOptions = () => {
@@ -14,26 +41,27 @@ const monthOptions = () => {
 
 /** Part fields shared by the new-project form and the add-part form. */
 function PartFields() {
+  const id = useId(); // rendered once per project card, so ids must be unique
   return (
     <>
-      <label className="field col-span-2">
-        Part
-        <input name="part" required className="input" placeholder="Furniture" />
-      </label>
-      <label className="field">
-        Cost
-        <input name="cost" inputMode="decimal" required autoComplete="off" className="input" placeholder="20,000" />
-      </label>
-      <label className="field">
-        Pay in
-        <select name="payMonth" className="input">
+      <Field className="col-span-2">
+        <FieldLabel htmlFor={`${id}-part`}>Part</FieldLabel>
+        <Input id={`${id}-part`} name="part" required placeholder="Furniture" />
+      </Field>
+      <Field>
+        <FieldLabel htmlFor={`${id}-cost`}>Cost</FieldLabel>
+        <Input id={`${id}-cost`} name="cost" inputMode="decimal" required autoComplete="off" placeholder="20,000" />
+      </Field>
+      <Field>
+        <FieldLabel htmlFor={`${id}-month`}>Pay in</FieldLabel>
+        <NativeSelect id={`${id}-month`} name="payMonth" className="w-full">
           {monthOptions().map((m) => (
-            <option key={m} value={m}>
+            <NativeSelectOption key={m} value={m}>
               {monthLabel(m)}
-            </option>
+            </NativeSelectOption>
           ))}
-        </select>
-      </label>
+        </NativeSelect>
+      </Field>
     </>
   );
 }
@@ -59,20 +87,19 @@ export function ProjectForm() {
 
   return (
     <Card title="New project">
-      <form onSubmit={submit} className="grid grid-cols-2 gap-3">
-        <label className="field col-span-2">
-          Project
-          <input name="project" required className="input" placeholder="Home renovation" />
-        </label>
-        <PartFields />
-        {error && (
-          <p role="alert" className="col-span-2 text-sm text-negative">
-            {error}
-          </p>
-        )}
-        <button type="submit" className="btn btn-primary col-span-2">
-          Create project
-        </button>
+      <form onSubmit={submit}>
+        <FieldGroup className="grid grid-cols-2 gap-4">
+          <Field className="col-span-2">
+            <FieldLabel htmlFor="project-name">Project</FieldLabel>
+            <Input id="project-name" name="project" required placeholder="Home renovation" />
+          </Field>
+          <PartFields />
+          {error && <FieldError className="col-span-2">{error}</FieldError>}
+          <Button type="submit" className="col-span-2">
+            <PlusIcon data-icon="inline-start" />
+            Create project
+          </Button>
+        </FieldGroup>
       </form>
     </Card>
   );
@@ -88,15 +115,22 @@ function AddPartForm({ projectId }: { projectId: string }) {
   };
 
   return (
-    <details>
-      <summary className="btn cursor-pointer">Add part</summary>
-      <form onSubmit={submit} className="mt-3 grid grid-cols-2 gap-3">
-        <PartFields />
-        <button type="submit" className="btn btn-primary col-span-2">
-          Add part
-        </button>
-      </form>
-    </details>
+    <Collapsible>
+      <CollapsibleTrigger render={<Button variant="outline" className="w-full" />}>
+        <PlusIcon data-icon="inline-start" />
+        Add part
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <form onSubmit={submit} className="pt-4">
+          <FieldGroup className="grid grid-cols-2 gap-4">
+            <PartFields />
+            <Button type="submit" className="col-span-2">
+              Add part
+            </Button>
+          </FieldGroup>
+        </form>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -107,17 +141,28 @@ function ProjectCard({ projectId, parts }: { projectId: string; parts: ProjectPa
   const months = monthOptions();
 
   return (
-    <Card title={parts[0].project} action={<span className="text-sm tabular-nums">{money(plan.total)} left</span>}>
+    <Card
+      title={parts[0].project}
+      action={
+        <Badge variant="secondary" className="tabular-nums">
+          {money(plan.total)} left
+        </Badge>
+      }
+    >
       {plan.total > 0 &&
         (plan.covered ? (
-          <p className="text-sm font-medium text-positive">Covered by savings and salary.</p>
+          <p className="flex items-center gap-2 rounded-lg bg-positive/10 px-3 py-2 text-sm font-semibold text-positive">
+            <CheckCircle2Icon className="size-4" aria-hidden="true" />
+            Covered by savings and salary.
+          </p>
         ) : (
-          <div className="text-sm">
-            <p className="font-medium text-warning">
+          <div className="flex flex-col gap-1 rounded-lg bg-warning/10 px-3 py-2 text-sm">
+            <p className="flex items-center gap-2 font-semibold text-warning">
+              <LandmarkIcon className="size-4 shrink-0" aria-hidden="true" />
               Needs a loan of {money(plan.loan?.amount ?? 0)}: {money(plan.loan?.payment ?? 0)}/mo, +
               {money(plan.loan?.totalInterest ?? 0)} interest.
             </p>
-            <p className="text-muted">
+            <p className="text-muted-foreground">
               {plan.affordableMonth
                 ? `Without a loan, affordable from ${monthLabel(plan.affordableMonth)}.`
                 : "Not affordable without a loan within 10 years."}
@@ -125,40 +170,39 @@ function ProjectCard({ projectId, parts }: { projectId: string; parts: ProjectPa
           </div>
         ))}
 
-      <ul className="divide-y divide-border">
+      <ul className="divide-y">
         {parts.map((p) => (
           <li key={p.partId} className="flex flex-wrap items-center justify-between gap-2 py-2">
             <div className="flex flex-col">
-              <span className="text-sm">{p.part}</span>
-              <span className="text-xs text-muted tabular-nums">{money(p.cost)}</span>
+              <span className="text-sm font-medium">{p.part}</span>
+              <span className="text-xs text-muted-foreground tabular-nums">{money(p.cost)}</span>
             </div>
             {p.status === "Paid" ? (
-              <span className="text-xs text-muted">Paid {p.paidDate}</span>
+              <Badge variant="outline">Paid {p.paidDate}</Badge>
             ) : (
               <div className="flex items-center gap-2">
-                <select
+                <NativeSelect
                   aria-label={`Payment month for ${p.part}`}
-                  className="input w-auto"
                   value={p.payMonth}
                   onChange={(e) => budgetActions.movePart(p.partId, e.target.value)}
                 >
                   {(months.includes(p.payMonth) ? months : [p.payMonth, ...months]).map((m) => (
-                    <option key={m} value={m}>
+                    <NativeSelectOption key={m} value={m}>
                       {monthLabel(m)}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </select>
-                <button type="button" className="btn btn-small" onClick={() => budgetActions.payPart(p.partId)}>
+                </NativeSelect>
+                <Button variant="secondary" onClick={() => budgetActions.payPart(p.partId)}>
                   Pay
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-small"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   aria-label={`Remove ${p.part}`}
                   onClick={() => budgetActions.removePart(p.partId)}
                 >
-                  ✕
-                </button>
+                  <XIcon />
+                </Button>
               </div>
             )}
           </li>
@@ -166,27 +210,27 @@ function ProjectCard({ projectId, parts }: { projectId: string; parts: ProjectPa
       </ul>
 
       {plan.total > 0 && (
-        <table className="w-full text-sm tabular-nums">
-          <caption className="text-left text-xs text-muted">Month by month</caption>
-          <thead className="text-xs text-muted">
-            <tr>
-              <th className="text-left font-normal">Month</th>
-              <th className="text-right font-normal">In</th>
-              <th className="text-right font-normal">Paid</th>
-              <th className="text-right font-normal">Balance</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="tabular-nums">
+          <TableCaption className="caption-top text-left text-xs">Month by month</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Month</TableHead>
+              <TableHead className="text-right">In</TableHead>
+              <TableHead className="text-right">Paid</TableHead>
+              <TableHead className="text-right">Balance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {plan.months.map((m) => (
-              <tr key={m.month}>
-                <td>{m.month}</td>
-                <td className="text-right">{money(m.added)}</td>
-                <td className="text-right">{m.paid ? money(m.paid) : ""}</td>
-                <td className={`text-right ${m.balance < 0 ? "text-negative" : ""}`}>{money(m.balance)}</td>
-              </tr>
+              <TableRow key={m.month}>
+                <TableCell>{m.month}</TableCell>
+                <TableCell className="text-right">{money(m.added)}</TableCell>
+                <TableCell className="text-right">{m.paid ? money(m.paid) : ""}</TableCell>
+                <TableCell className={cn("text-right", m.balance < 0 && "text-negative")}>{money(m.balance)}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
 
       <AddPartForm projectId={projectId} />
@@ -199,7 +243,15 @@ export function ProjectList() {
   const projects = Map.groupBy(b.parts, (p) => p.projectId);
 
   return projects.size === 0 ? (
-    <p className="text-sm text-muted">No projects yet. Plan multi-month spending, like a renovation, above.</p>
+    <Empty className="border">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <HammerIcon />
+        </EmptyMedia>
+        <EmptyTitle>No projects yet</EmptyTitle>
+        <EmptyDescription>Plan multi-month spending, like a renovation, above.</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   ) : (
     [...projects].map(([id, parts]) => <ProjectCard key={id} projectId={id} parts={parts} />)
   );

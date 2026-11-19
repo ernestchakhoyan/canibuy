@@ -2,7 +2,21 @@
 
 import { cushion, formatMoney, parseAmount, savingsBalance, usableSavings } from "@helper";
 import { budgetActions, useLoadedBudget } from "@store";
-import { Card, EntryRow, Stat } from "@widget";
+import {
+  Button,
+  Card,
+  EntryRow,
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  NativeSelect,
+  NativeSelectOption,
+  Separator,
+  Stat,
+} from "@widget";
+import { ArrowDownToLineIcon, ArrowUpFromLineIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 export function SavingsOverview() {
@@ -12,6 +26,7 @@ export function SavingsOverview() {
   return (
     <Card>
       <Stat big label="Savings balance" value={money(savingsBalance(b))} />
+      <Separator />
       <div className="grid grid-cols-2 gap-4">
         <Stat label="Safety cushion" value={money(cushion(b))} hint={`${b.settings.cushionMonths} months of bills`} />
         <Stat label="Available for orders and projects" value={money(usableSavings(b))} tone="positive" />
@@ -44,37 +59,45 @@ export function SavingsForm() {
 
   return (
     <Card title="Move money">
-      <form onSubmit={submit} className="grid grid-cols-2 gap-3">
-        <label className="field">
-          Amount
-          <input name="amount" inputMode="decimal" required autoComplete="off" className="input" placeholder="0" />
-        </label>
-        <label className="field">
-          For order
-          <select name="order" className="input" disabled={openOrders.length === 0}>
-            <option value="">None</option>
-            {openOrders.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.item}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field col-span-2">
-          Note
-          <input name="note" className="input" placeholder="Optional" />
-        </label>
-        {error && (
-          <p role="alert" className="col-span-2 text-sm text-negative">
-            {error}
-          </p>
-        )}
-        <button type="submit" name="action" value="add" className="btn btn-primary">
-          Add to savings
-        </button>
-        <button type="submit" name="action" value="take" className="btn">
-          Take from savings
-        </button>
+      <form onSubmit={submit}>
+        <FieldGroup className="grid grid-cols-2 gap-4">
+          <Field data-invalid={!!error || undefined}>
+            <FieldLabel htmlFor="savings-amount">Amount</FieldLabel>
+            <Input
+              id="savings-amount"
+              name="amount"
+              inputMode="decimal"
+              required
+              autoComplete="off"
+              placeholder="0"
+              aria-invalid={!!error || undefined}
+            />
+          </Field>
+          <Field data-disabled={openOrders.length === 0 || undefined}>
+            <FieldLabel htmlFor="savings-order">For order</FieldLabel>
+            <NativeSelect id="savings-order" name="order" className="w-full" disabled={openOrders.length === 0}>
+              <NativeSelectOption value="">None</NativeSelectOption>
+              {openOrders.map((o) => (
+                <NativeSelectOption key={o.id} value={o.id}>
+                  {o.item}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field className="col-span-2">
+            <FieldLabel htmlFor="savings-note">Note</FieldLabel>
+            <Input id="savings-note" name="note" placeholder="Optional" />
+          </Field>
+          {error && <FieldError className="col-span-2">{error}</FieldError>}
+          <Button type="submit" name="action" value="add">
+            <ArrowDownToLineIcon data-icon="inline-start" />
+            Add to savings
+          </Button>
+          <Button type="submit" name="action" value="take" variant="outline">
+            <ArrowUpFromLineIcon data-icon="inline-start" />
+            Take out
+          </Button>
+        </FieldGroup>
       </form>
     </Card>
   );
@@ -88,10 +111,9 @@ export function SavingsHistory() {
     .sort((a, z) => z.date.localeCompare(a.date) || z.createdAt.localeCompare(a.createdAt));
 
   return (
-    <Card title="Savings history">
-      <p className="text-sm text-muted">Opening savings: {money(b.settings.openingSavings)}</p>
+    <Card title="Savings history" description={`Opening savings: ${money(b.settings.openingSavings)}`}>
       {moves.length > 0 && (
-        <ul className="divide-y divide-border">
+        <ul className="divide-y">
           {moves.map((e) => (
             <EntryRow key={e.id} entry={e} money={money} onDelete={() => budgetActions.removeEntry(e.id)} />
           ))}

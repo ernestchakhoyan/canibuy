@@ -43,5 +43,13 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/widget/ui/**"],
+      "linter": {
+        "enabled": false
+      }
+    }
+  ]
 }

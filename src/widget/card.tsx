@@ -1,17 +1,20 @@
 import type { ReactNode } from "react";
+import { CardAction, CardContent, CardDescription, CardHeader, CardTitle, Card as UiCard } from "./ui/card";
 
-type Props = { title?: string; action?: ReactNode; children: ReactNode };
+type Props = { title?: string; description?: ReactNode; action?: ReactNode; className?: string; children: ReactNode };
 
-export function Card({ title, action, children }: Props) {
+/** App card: shadcn Card with the header filled in from props. */
+export function Card({ title, description, action, className, children }: Props) {
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+    <UiCard className={className}>
       {(title || action) && (
-        <header className="flex items-center justify-between gap-2">
-          {title && <h2 className="text-base font-semibold">{title}</h2>}
-          {action}
-        </header>
+        <CardHeader>
+          {title && <CardTitle className="text-base font-semibold">{title}</CardTitle>}
+          {description && <CardDescription>{description}</CardDescription>}
+          {action && <CardAction>{action}</CardAction>}
+        </CardHeader>
       )}
-      {children}
-    </section>
+      <CardContent className="flex flex-col gap-4">{children}</CardContent>
+    </UiCard>
   );
 }

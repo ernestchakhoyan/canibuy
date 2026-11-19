@@ -2,7 +2,27 @@
 
 import { addMonths, formatMoney, monthIncome, monthLabel, monthOf, parseAmount, todayISO } from "@helper";
 import { budgetActions, useLoadedBudget } from "@store";
-import { Card, EntryRow } from "@widget";
+import {
+  Button,
+  Card,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+  EntryRow,
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+  Input,
+  Label,
+  NativeSelect,
+  NativeSelectOption,
+  RadioGroup,
+  RadioGroupItem,
+} from "@widget";
+import { PlusIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 const MONTHS_AHEAD = 24;
@@ -31,42 +51,56 @@ export function IncomeForm() {
 
   return (
     <Card title="Add income">
-      <form onSubmit={submit} className="grid grid-cols-2 gap-3">
-        <label className="field">
-          Amount
-          <input name="amount" inputMode="decimal" required autoComplete="off" className="input" placeholder="0" />
-        </label>
-        <label className="field">
-          Month
-          <select name="month" className="input">
-            {months.map((m) => (
-              <option key={m} value={m}>
-                {monthLabel(m)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <fieldset className="col-span-2 flex gap-4 text-sm">
-          <legend className="sr-only">Income type</legend>
-          <label className="flex min-h-11 items-center gap-2">
-            <input type="radio" name="type" value="salary" defaultChecked /> Salary (replaces usual income)
-          </label>
-          <label className="flex min-h-11 items-center gap-2">
-            <input type="radio" name="type" value="extra" /> Extra
-          </label>
-        </fieldset>
-        <label className="field col-span-2">
-          Note
-          <input name="note" className="input" placeholder="Optional" />
-        </label>
-        {error && (
-          <p role="alert" className="col-span-2 text-sm text-negative">
-            {error}
-          </p>
-        )}
-        <button type="submit" className="btn btn-primary col-span-2">
-          Add income
-        </button>
+      <form onSubmit={submit}>
+        <FieldGroup className="grid grid-cols-2 gap-4">
+          <Field data-invalid={!!error || undefined}>
+            <FieldLabel htmlFor="income-amount">Amount</FieldLabel>
+            <Input
+              id="income-amount"
+              name="amount"
+              inputMode="decimal"
+              required
+              autoComplete="off"
+              placeholder="0"
+              aria-invalid={!!error || undefined}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="income-month">Month</FieldLabel>
+            <NativeSelect id="income-month" name="month" className="w-full">
+              {months.map((m) => (
+                <NativeSelectOption key={m} value={m}>
+                  {monthLabel(m)}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <FieldSet className="col-span-2">
+            <RadioGroup name="type" defaultValue="salary" aria-label="Income type" className="flex flex-wrap gap-x-6">
+              <Field orientation="horizontal" className="min-h-11 w-auto">
+                <RadioGroupItem value="salary" id="income-salary" />
+                <Label htmlFor="income-salary" className="font-normal">
+                  Salary (replaces usual income)
+                </Label>
+              </Field>
+              <Field orientation="horizontal" className="min-h-11 w-auto">
+                <RadioGroupItem value="extra" id="income-extra" />
+                <Label htmlFor="income-extra" className="font-normal">
+                  Extra
+                </Label>
+              </Field>
+            </RadioGroup>
+          </FieldSet>
+          <Field className="col-span-2">
+            <FieldLabel htmlFor="income-note">Note</FieldLabel>
+            <Input id="income-note" name="note" placeholder="Optional" />
+          </Field>
+          {error && <FieldError className="col-span-2">{error}</FieldError>}
+          <Button type="submit" className="col-span-2">
+            <PlusIcon data-icon="inline-start" />
+            Add income
+          </Button>
+        </FieldGroup>
       </form>
     </Card>
   );
@@ -81,14 +115,19 @@ export function IncomeList() {
     .sort((a, z) => a.date.localeCompare(z.date));
 
   return (
-    <Card title="This month and upcoming">
-      <p className="text-sm text-muted">
-        {monthLabel(current)}: {money(monthIncome(b, current))} expected
-      </p>
+    <Card
+      title="This month and upcoming"
+      description={`${monthLabel(current)}: ${money(monthIncome(b, current))} expected`}
+    >
       {income.length === 0 ? (
-        <p className="text-sm text-muted">No income entries. Months without a salary use your usual income.</p>
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>No income entries</EmptyTitle>
+            <EmptyDescription>Months without a salary use your usual income.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <ul className="divide-y divide-border">
+        <ul className="divide-y">
           {income.map((e) => (
             <EntryRow key={e.id} entry={e} money={money} onDelete={() => budgetActions.removeEntry(e.id)} />
           ))}

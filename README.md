@@ -1,4 +1,4 @@
-# Smart Money Calculator
+# canibuy
 
 A phone-friendly personal finance app that answers two questions every month: **how much can I save**, and **can I
 afford this purchase or project?** You sign in with Google, the app creates a Google Sheet in your Drive, and every

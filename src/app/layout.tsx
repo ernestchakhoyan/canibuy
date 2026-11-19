@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Smart Money Calculator", template: "%s · Smart Money" },
+  title: { default: "canibuy", template: "%s · canibuy" },
   description: "How much can I save this month, and can I afford this?",
 };
 

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Product
 
-Smart Money Calculator: a budgeting PWA whose database is the user's own Google Sheet. `README.md` summarizes it; the
+canibuy (formerly Smart Money Calculator): a budgeting PWA whose database is the user's own Google Sheet. `README.md` summarizes it; the
 [PRD](https://claude.ai/artifact/L2o4khqW7BYZqYMszvw91E#335028cc-46cf) is the source of truth for requirement IDs
 (`SET-*`, `MON-*`, `AUTH-*`, `SHEET-*`…), the sheet template and the calculation rules — read it before building a
 feature.
@@ -64,8 +64,12 @@ Data flows one way: `src/app/<route>/page.tsx` → builder (`@builder`) → cont
   - Tailwind is wired through a Turbopack CSS loader (`@tailwindcss/turbopack`), not PostCSS — there is no
     `postcss.config`.
 - Tailwind v4 is CSS-first: theme tokens are defined in `src/app/globals.css` via `@theme inline`, no `tailwind.config`.
-  Shared classes (`input`, `field`, `btn`, `btn-primary`, `btn-small`) are `@utility` rules there — `@layer
-  components` classes are dropped by this pipeline.
+  Brand tokens ("Ledger green" primary, `brand-gold` / `brand-gold-ink`, money tones `positive`/`negative`/`warning`)
+  live there too; dark mode follows `prefers-color-scheme` (the `dark:` variant is a media query, no theme toggle).
+- UI is shadcn/ui (Base UI primitives, `base-nova` style, lucide icons). `components.json` puts components in
+  `src/widget/ui` and re-exports them from the `@widget` barrel — import `Button`, `Field`, … from `@widget`. Add more
+  with `bunx --bun shadcn@latest add <name>` and export them from `src/widget/index.ts`. `src/widget/ui` is vendored:
+  Biome formats it but doesn't lint it. Control heights are bumped to 44px (`h-11`) for touch.
 - Route props use Next's generated global types (e.g. `LayoutProps<"/">`, `PageProps<...>`) from `.next/types`, produced
   by `next dev`/`next build`.
 

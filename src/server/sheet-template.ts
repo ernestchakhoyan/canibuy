@@ -5,7 +5,7 @@ import type { Budget } from "@type";
 // Pure (no "server-only") so `bun run test` can check it outside Next.
 
 export const TEMPLATE_VERSION = 1;
-export const SPREADSHEET_TITLE = "Smart Money Calculator";
+export const SPREADSHEET_TITLE = "canibuy";
 
 const SHEET_ID = { setup: 0, orders: 1, projects: 2, monthTemplate: 3, currentMonth: 4 } as const;
 

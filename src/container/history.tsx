@@ -3,7 +3,21 @@
 import { formatMoney, type Period, periodRange, shiftPeriod, spendingByCategory, todayISO } from "@helper";
 import { useLoadedBudget } from "@store";
 import type { Entry } from "@type";
-import { Card, EntryRow, Stat } from "@widget";
+import {
+  Button,
+  Card,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+  EntryRow,
+  Input,
+  Progress,
+  Stat,
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@widget";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 
 const PERIODS: Period[] = ["day", "week", "month", "year"];
@@ -37,49 +51,48 @@ export function History() {
   return (
     <>
       <Card>
-        <fieldset className="grid grid-cols-4 gap-1">
-          <legend className="sr-only">Period</legend>
+        <ToggleGroup
+          aria-label="Period"
+          variant="outline"
+          className="grid w-full grid-cols-4"
+          value={[period]}
+          onValueChange={(v) => v[0] && setPeriod(v[0] as Period)}
+        >
           {PERIODS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              aria-pressed={p === period}
-              className={`btn btn-small capitalize ${p === period ? "btn-primary" : ""}`}
-              onClick={() => setPeriod(p)}
-            >
+            <ToggleGroupItem key={p} value={p} className="capitalize">
               {p}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </fieldset>
+        </ToggleGroup>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-small"
+          <Button
+            variant="outline"
+            size="icon"
             aria-label="Previous period"
             onClick={() => setDate(shiftPeriod(period, date, -1))}
           >
-            ‹
-          </button>
-          <input
+            <ChevronLeftIcon />
+          </Button>
+          <Input
             type="date"
             aria-label="Date"
-            className="input flex-1"
+            className="flex-1"
             value={date}
             onChange={(e) => e.target.value && setDate(e.target.value)}
           />
-          <button
-            type="button"
-            className="btn btn-small"
+          <Button
+            variant="outline"
+            size="icon"
             aria-label="Next period"
             onClick={() => setDate(shiftPeriod(period, date, 1))}
           >
-            ›
-          </button>
-          <button type="button" className="btn btn-small" onClick={() => setDate(todayISO())}>
+            <ChevronRightIcon />
+          </Button>
+          <Button variant="secondary" onClick={() => setDate(todayISO())}>
             Today
-          </button>
+          </Button>
         </div>
-        <p className="text-xs text-muted">{from === to ? from : `${from} – ${to}`}</p>
+        <p className="text-xs text-muted-foreground">{from === to ? from : `${from} – ${to}`}</p>
       </Card>
 
       <div className="grid grid-cols-2 gap-4">
@@ -100,13 +113,16 @@ export function History() {
 
       {byCategory.length > 0 && (
         <Card title="By category">
-          <ul className="flex flex-col gap-1 text-sm">
+          <ul className="flex flex-col gap-3 text-sm">
             {byCategory.map(({ category, amount }) => (
-              <li key={category} className="flex justify-between">
-                <span>{category || "Uncategorized"}</span>
-                <span className="tabular-nums">
-                  {money(amount)} · {Math.round((amount / outcomes) * 100)}%
-                </span>
+              <li key={category} className="flex flex-col gap-1.5">
+                <div className="flex justify-between">
+                  <span>{category || "Uncategorized"}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {money(amount)} · {Math.round((amount / outcomes) * 100)}%
+                  </span>
+                </div>
+                <Progress value={amount} max={outcomes} aria-label={`${category || "Uncategorized"} share`} />
               </li>
             ))}
           </ul>
@@ -114,24 +130,27 @@ export function History() {
       )}
 
       <Card title="Entries">
-        <fieldset className="flex flex-wrap gap-1">
-          <legend className="sr-only">Filter entries</legend>
+        <ToggleGroup
+          aria-label="Filter entries"
+          className="flex-wrap"
+          value={[filter]}
+          onValueChange={(v) => v[0] && setFilter(v[0] as Filter)}
+        >
           {(Object.keys(FILTERS) as Filter[]).map((f) => (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={f === filter}
-              className={`btn btn-small ${f === filter ? "btn-primary" : ""}`}
-              onClick={() => setFilter(f)}
-            >
+            <ToggleGroupItem key={f} value={f}>
               {f}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </fieldset>
+        </ToggleGroup>
         {entries.filter(FILTERS[filter]).length === 0 ? (
-          <p className="text-sm text-muted">Nothing in this period.</p>
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyTitle>Nothing here yet</EmptyTitle>
+              <EmptyDescription>No entries in this period.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="divide-y">
             {entries.filter(FILTERS[filter]).map((e) => (
               <EntryRow key={e.id} entry={e} money={money} />
             ))}

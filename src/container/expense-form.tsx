@@ -2,7 +2,18 @@
 
 import { parseAmount, todayISO } from "@helper";
 import { budgetActions, useLoadedBudget } from "@store";
-import { Card } from "@widget";
+import {
+  Button,
+  Card,
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  NativeSelect,
+  NativeSelectOption,
+} from "@widget";
+import { PlusIcon } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 export function ExpenseForm() {
@@ -27,35 +38,42 @@ export function ExpenseForm() {
 
   return (
     <Card title="Add expense">
-      <form onSubmit={submit} className="grid grid-cols-2 gap-3">
-        <label className="field">
-          Amount
-          <input name="amount" inputMode="decimal" required autoComplete="off" className="input" placeholder="0" />
-        </label>
-        <label className="field">
-          Category
-          <select name="category" className="input">
-            {b.categories.map((c) => (
-              <option key={c.name}>{c.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          Date
-          <input name="date" type="date" defaultValue={todayISO()} className="input" />
-        </label>
-        <label className="field">
-          Note
-          <input name="note" className="input" placeholder="Optional" />
-        </label>
-        {error && (
-          <p role="alert" className="col-span-2 text-sm text-negative">
-            {error}
-          </p>
-        )}
-        <button type="submit" className="btn btn-primary col-span-2">
-          Add expense
-        </button>
+      <form onSubmit={submit}>
+        <FieldGroup className="grid grid-cols-2 gap-4">
+          <Field data-invalid={!!error || undefined}>
+            <FieldLabel htmlFor="expense-amount">Amount</FieldLabel>
+            <Input
+              id="expense-amount"
+              name="amount"
+              inputMode="decimal"
+              required
+              autoComplete="off"
+              placeholder="0"
+              aria-invalid={!!error || undefined}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="expense-category">Category</FieldLabel>
+            <NativeSelect id="expense-category" name="category" className="w-full">
+              {b.categories.map((c) => (
+                <NativeSelectOption key={c.name}>{c.name}</NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="expense-date">Date</FieldLabel>
+            <Input id="expense-date" name="date" type="date" defaultValue={todayISO()} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="expense-note">Note</FieldLabel>
+            <Input id="expense-note" name="note" placeholder="Optional" />
+          </Field>
+          {error && <FieldError className="col-span-2">{error}</FieldError>}
+          <Button type="submit" className="col-span-2">
+            <PlusIcon data-icon="inline-start" />
+            Add expense
+          </Button>
+        </FieldGroup>
       </form>
     </Card>
   );
