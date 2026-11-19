@@ -11,6 +11,7 @@ next-env.d.ts
 
 # env files and keys (OAuth client secret, token encryption key)
 .env*
+!.env.example
 *.pem
 
 # editors and OS

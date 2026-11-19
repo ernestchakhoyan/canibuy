@@ -1,3 +1,4 @@
+export * from "./auth";
 export * from "./expense-form";
 export * from "./history";
 export * from "./income";

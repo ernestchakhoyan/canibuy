@@ -7,8 +7,10 @@ entry (income, expense, saving) is stored there. You own the data and can edit t
 Full requirements: [PRD](https://claude.ai/artifact/L2o4khqW7BYZqYMszvw91E#335028cc-46cf). It is the source of truth.
 This README summarizes it.
 
-> **Status:** all P0 screens (Setup, This month, Income, Savings, Orders, Projects, History) and the calculation engine
-> work, with data kept in the browser (`localStorage`). Google sign-in and Sheets sync (M1) are not built yet.
+> **Status:** M1 in progress. "Connect Google Sheet" (one Google consent, no separate login) and sheet creation are
+> built. All P0 screens and
+> the calculation engine work, but entries are still kept in the browser (`localStorage`); writing them to the sheet is
+> M2.
 
 ## Features (v1)
 
@@ -27,12 +29,12 @@ shared budgets.
 
 ## How it works
 
-1. **Sign in** with Google (OpenID Connect: `openid email profile` only). The session lives in an httpOnly cookie.
-2. **Connect a sheet.** A separate consent step asks for the `drive.file` scope, so the app sees only the sheet it
-   creates. The backend stores the refresh token encrypted. The browser never holds it.
-3. **The app builds the spreadsheet** with these tabs: `Setup` (named ranges `Settings`, `Bills`, `Categories`),
+1. **Connect Google Sheet.** One Google consent asks for name, email and the `drive.file` scope, so the app sees only
+   the sheet it creates. There is no separate login and no server database: the refresh token lives in an encrypted,
+   httpOnly cookie that page scripts can't read.
+2. **The app builds the spreadsheet** with these tabs: `Setup` (named ranges `Settings`, `Bills`, `Categories`),
    `Orders`, `Projects`, a hidden `_MonthTemplate`, and one `YYYY-MM` tab per month.
-4. **Every change is recalculated** from the raw rows by a shared TypeScript engine. Nothing calculated is stored. Sheet
+3. **Every change is recalculated** from the raw rows by a shared TypeScript engine. Nothing calculated is stored. Sheet
    formulas exist only for people reading the sheet.
 
 Sheet rules: row 1 holds the column names, and the app finds columns by name, never by position. Every row has a short
@@ -82,10 +84,11 @@ Loan payment for amount `A`, monthly rate `i` (yearly ÷ 12) and `n` months: `A 
 
 ## Development
 
-Requires [bun](https://bun.sh) 1.2+.
+Requires [bun](https://bun.sh) 1.2+ and a Google OAuth client (below).
 
 ```bash
 bun install
+cp .env.example .env.local   # then fill it in
 bun dev            # http://localhost:3000
 bun run lint       # biome check
 bun run format     # biome format --write
@@ -95,11 +98,26 @@ bun run build
 
 Code conventions (folder layout, path aliases, imports, commits, branches) are in [CLAUDE.md](CLAUDE.md).
 
+### Google OAuth client setup (once, by the developer)
+
+Users never do this: every Google API app needs one registered OAuth client, and each user then connects their own
+sheet to it on the consent screen.
+
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and enable the **Google Sheets API**
+   and **Google Drive API**.
+2. **OAuth consent screen:** External, add the scopes `openid`, `email`, `profile` and `.../auth/drive.file`, and add
+   yourself as a test user. `drive.file` is a non-sensitive scope, so personal use needs no Google verification.
+3. **Credentials → Create OAuth client ID → Web application.** Authorized redirect URI:
+   `http://localhost:3000/api/auth/callback/google` (add your production URL the same way).
+4. Put the client ID and secret in `.env.local` as `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`, and set `AUTH_SECRET`
+   (`openssl rand -base64 32`).
+
 ## Milestones
 
 | Milestone              | Scope                                                       | Done when                                                       |
 | ---------------------- | ----------------------------------------------------------- | --------------------------------------------------------------- |
-| M1 Sign-in and sheet   | Google sign-in, connect, create the sheet                   | A new user signs in, connects, and sees the sheet with all tabs |
+| M1 Connect and sheet   | One-step Google connect, create the sheet                   | A new user connects and sees the sheet in Drive with all tabs   |
 | M2 Core month          | Setup, This month, Income, Savings, reading and writing the sheet | App entries appear in the month tab and match the sheet summary |
 | M3 Planning            | Orders and Projects with verdicts                           | The furniture project shows a correct plan from real data       |
 | M4 History and polish  | History, offline queue, sheet repair                        | All P0 requirements pass; the app works offline                 |

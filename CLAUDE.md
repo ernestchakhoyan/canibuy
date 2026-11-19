@@ -20,7 +20,7 @@ Package manager is **bun** (`bun.lock`, `packageManager: bun@1.2.3`).
 - `bun run lint` — `biome check` (lint + format check + import sorting); `bunx biome check --write` to autofix
 - `bun run format` — `biome format --write`
 
-- `bun run test` — runs `src/helper/engine.check.ts`, an assert-based self-check of the calculation engine (no test
+- `bun run test` — runs `src/helper/engine.check.ts` and `src/server/sheet-template.check.ts`, assert-based self-checks (no test
   framework; it uses `node:assert` so `next build`'s typecheck passes)
 
 Biome replaces ESLint/Prettier — don't add either.
@@ -38,6 +38,15 @@ Data flows one way: `src/app/<route>/page.tsx` → builder (`@builder`) → cont
   stand-in for Google Sheets (M1/M2); the `Budget` shape in `src/@type/budget.type.ts` mirrors the sheet tabs.
 - **Engine** (`src/helper/engine.ts`): pure functions implementing PRD section 7. Nothing calculated is stored —
   everything is derived from raw entries on each render.
+- **Auth (M1):** Auth.js v5 in `src/server/auth.ts`, Google REST calls over `fetch` in `src/server/google.ts`, server
+  actions in `src/action/auth.action.ts`, routing in `src/proxy.ts` (Next 16's renamed middleware): no connected sheet → `/connect`, the only public
+  page. There is no separate login: one Google consent asks `openid email profile drive.file` (offline + consent) and
+  the `jwt` callback finds-or-creates the sheet. Every user connects their own sheet with the app's one OAuth client. There is no database: tokens and
+  the spreadsheet ID live in the encrypted session cookie, and the sheet is rediscovered via a Drive `appProperties`
+  tag. `session` exposes only `user` and `sheet` — read Google tokens server-side with `googleToken()`.
+- `src/server/sheet-template.ts` builds the whole sheet (PRD section 6) as one `spreadsheets.create` body; it stays
+  free of `server-only` so `bun run test` can check it. Server components that call `auth()` need
+  `await connection()` first (Auth.js touches `crypto` before cookies, which Cache Components rejects).
 - `AppShell` (root layout) must always render `children`: hiding the page segment on the server breaks Partial
   Prefetching's instant-navigation validation. Put loading gates inside builders instead.
 - Cache Components keeps visited pages mounted but hidden (`<Activity>`): forms reset in their submit handler, and

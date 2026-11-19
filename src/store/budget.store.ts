@@ -1,34 +1,11 @@
-import { fromSavings, monthOf, newId, todayISO } from "@helper";
+import { defaultBudget, fromSavings, newId, todayISO } from "@helper";
 import type { Bill, Budget, Entry, Order, OrderStatus, ProjectPart, Settings } from "@type";
 import { useSyncExternalStore } from "react";
 
-// ponytail: browser-only store (localStorage). Replace persistence with the Google Sheets sync in M1/M2;
+// ponytail: browser-only store (localStorage). Entries move to the Google Sheet in M2;
 // the local copy stays as the offline queue the PRD asks for.
 
 const STORAGE_KEY = "smart-money:v1";
-
-const defaultBudget = (): Budget => {
-  const month = monthOf(todayISO());
-  return {
-    settings: {
-      currency: "$",
-      usualIncome: 0,
-      openingSavings: 0,
-      cushionMonths: 3,
-      loanRate: 14,
-      loanTermMonths: 12,
-      startMonth: month,
-    },
-    bills: [],
-    categories: ["Food", "Transport", "Home", "Utilities", "Health", "Fun", "Other"].map((name) => ({
-      name,
-      monthlyLimit: 0,
-    })),
-    entries: [],
-    orders: [],
-    parts: [],
-  };
-};
 
 let state: Budget | null = null;
 const listeners = new Set<() => void>();

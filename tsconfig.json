@@ -19,6 +19,8 @@
       }
     ],
     "paths": {
+      "@action": ["./src/action"],
+      "@action/*": ["./src/action/*"],
       "@builder": ["./src/builder"],
       "@builder/*": ["./src/builder/*"],
       "@container": ["./src/container"],
@@ -27,6 +29,8 @@
       "@helper/*": ["./src/helper/*"],
       "@layout": ["./src/layout"],
       "@layout/*": ["./src/layout/*"],
+      "@server": ["./src/server"],
+      "@server/*": ["./src/server/*"],
       "@store": ["./src/store"],
       "@store/*": ["./src/store/*"],
       "@type": ["./src/@type"],
