@@ -1,7 +1,7 @@
 "use client";
 
 import { cn, formatMoney, orderVerdict, parseAmount, savedToward, todayISO, type Verdict } from "@helper";
-import { budgetActions, useLoadedBudget } from "@store";
+import { budgetActions, useLoadedBudget, useOrdersSyncFailed } from "@store";
 import type { Order } from "@type";
 import {
   Badge,
@@ -18,17 +18,25 @@ import {
   FieldLabel,
   Input,
   Progress,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from "@widget";
 import {
   CheckCircle2Icon,
   CircleSlashIcon,
+  HammerIcon,
   LandmarkIcon,
   PiggyBankIcon,
   SearchCheckIcon,
   ShoppingBagIcon,
+  XIcon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { type FormEvent, useId, useState } from "react";
+import { AffordOptions } from "./afford-options";
+import { ProjectPicker } from "./project-picker";
 
 const verdictText: Record<Verdict, { tone: string; icon: typeof PiggyBankIcon }> = {
   pay_now: { tone: "bg-positive/10 text-positive", icon: CheckCircle2Icon },
@@ -110,11 +118,27 @@ function OrderCard({ order }: { order: Order }) {
   const saved = savedToward(b, order.id);
   const { verdict, saveMonths, loan } = orderVerdict(b, order, todayISO());
   const Verdict = verdictText[verdict].icon;
+  const [choosingProject, setChoosingProject] = useState(false);
 
   return (
     <Card
       title={`${order.item} · ${money(order.price)}`}
-      action={<Badge variant={open ? "secondary" : "outline"}>{t(`status.${order.status}`)}</Badge>}
+      action={
+        <div className="flex items-center gap-1">
+          <Badge variant={open ? "secondary" : "outline"}>{t(`status.${order.status}`)}</Badge>
+          {/* Active orders are dropped first, so removing one always takes two deliberate taps. */}
+          {!open && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("card.remove", { item: order.item })}
+              onClick={() => budgetActions.removeOrder(order.id)}
+            >
+              <XIcon />
+            </Button>
+          )}
+        </div>
+      }
     >
       {open && (
         <>
@@ -148,21 +172,27 @@ function OrderCard({ order }: { order: Order }) {
               </dd>
             </div>
           </dl>
+          <AffordOptions order={order} />
           {saved > 0 && (
             <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
               <span>{t("card.saved", { saved: money(saved), price: money(order.price) })}</span>
               <Progress value={Math.min(saved, order.price)} max={order.price} aria-label={t("card.savedLabel")} />
             </div>
           )}
-          <div className="flex gap-2">
-            <Button className="flex-1" onClick={() => budgetActions.buyOrder(order.id)}>
+          <div className="grid grid-cols-2 gap-2">
+            <Button className="col-span-2" onClick={() => budgetActions.buyOrder(order.id)}>
               <ShoppingBagIcon data-icon="inline-start" />
               {t("card.markBought")}
+            </Button>
+            <Button variant="outline" onClick={() => setChoosingProject(true)}>
+              <HammerIcon data-icon="inline-start" />
+              {t("card.toProject")}
             </Button>
             <Button variant="outline" onClick={() => budgetActions.setOrderStatus(order.id, "Dropped")}>
               {t("card.drop")}
             </Button>
           </div>
+          <ProjectPicker order={order} open={choosingProject} onOpenChange={setChoosingProject} />
         </>
       )}
       {order.status === "Bought" && (
@@ -174,21 +204,57 @@ function OrderCard({ order }: { order: Order }) {
 
 export function OrderList() {
   const t = useTranslations("orders");
+  const tc = useTranslations("common");
   const b = useLoadedBudget();
-  const rank = { Saving: 0, Planned: 1, Bought: 2, Dropped: 3 };
-  const orders = [...b.orders].sort((a, z) => rank[a.status] - rank[z.status] || z.created.localeCompare(a.created));
+  const syncFailed = useOrdersSyncFailed();
+  const newestFirst = (a: Order, z: Order) => z.created.localeCompare(a.created);
+  const tabs = [
+    // Saving before Planned: money is already going toward those.
+    {
+      key: "active",
+      orders: b.orders
+        .filter((o) => o.status === "Saving")
+        .sort(newestFirst)
+        .concat(b.orders.filter((o) => o.status === "Planned").sort(newestFirst)),
+    },
+    { key: "bought", orders: b.orders.filter((o) => o.status === "Bought").sort(newestFirst) },
+    { key: "dropped", orders: b.orders.filter((o) => o.status === "Dropped").sort(newestFirst) },
+  ] as const;
 
-  return orders.length === 0 ? (
-    <Empty className="border">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <ShoppingBagIcon />
-        </EmptyMedia>
-        <EmptyTitle>{t("empty.title")}</EmptyTitle>
-        <EmptyDescription>{t("empty.description")}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  ) : (
-    orders.map((o) => <OrderCard key={o.id} order={o} />)
+  if (b.orders.length === 0) {
+    return (
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <ShoppingBagIcon />
+          </EmptyMedia>
+          <EmptyTitle>{t("empty.title")}</EmptyTitle>
+          <EmptyDescription>{t("empty.description")}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  return (
+    <Tabs defaultValue="active" className="gap-4">
+      <TabsList className="w-full">
+        {tabs.map(({ key, orders }) => (
+          <TabsTrigger key={key} value={key}>
+            {t(`tabs.${key}`)}
+            <span className="text-xs tabular-nums text-muted-foreground">{orders.length}</span>
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {syncFailed && <p className="text-sm text-destructive">{tc("syncFailed")}</p>}
+      {tabs.map(({ key, orders }) => (
+        <TabsContent key={key} value={key} className="flex flex-col gap-4">
+          {orders.length > 0 ? (
+            orders.map((o) => <OrderCard key={o.id} order={o} />)
+          ) : (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t(`tabs.empty.${key}`)}</p>
+          )}
+        </TabsContent>
+      ))}
+    </Tabs>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { cn, formatMoney, parseAmount } from "@helper";
+import { cn, formatMoney, monthLabel, parseAmount } from "@helper";
 import { budgetActions, useLoadedBudget } from "@store";
 import type { Settings } from "@type";
 import {
@@ -155,6 +155,14 @@ export function BillsEditor() {
                   className={cn("font-normal", !bill.active && "text-muted-foreground line-through")}
                 >
                   {t("bills.billLine", { name: bill.name, day: bill.dueDay })}
+                  {bill.endMonth && (
+                    <span className="block text-xs text-muted-foreground">
+                      {t("bills.range", {
+                        from: monthLabel(bill.startMonth ?? bill.endMonth, locale),
+                        to: monthLabel(bill.endMonth, locale),
+                      })}
+                    </span>
+                  )}
                 </Label>
               </Field>
               <div className="flex items-center gap-1">

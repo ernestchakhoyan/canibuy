@@ -36,6 +36,8 @@ Data flows one way: `src/app/[locale]/<route>/page.tsx` → builder (`@builder`)
   `useBudget()` is `null` on the server and during hydration; `BudgetGate` renders children only after it loads, so
   containers use `useLoadedBudget()` and never handle `null`. All writes go through `budgetActions`. This is the
   stand-in for Google Sheets (M1/M2); the `Budget` shape in `src/@type/budget.type.ts` mirrors the sheet tabs.
+  Already mirrored to the sheet (write-only, through validated server actions in `@action`): the Orders tab (the store
+  rewrites it after every orders change) and the Setup tab's Personal block. Nothing is read back from the sheet yet.
 - **Engine** (`src/helper/engine.ts`): pure functions implementing PRD section 7. Nothing calculated is stored —
   everything is derived from raw entries on each render.
 - **Auth (M1):** Auth.js v5 in `src/server/auth.ts`, Google REST calls over `fetch` in `src/server/google.ts`, server
@@ -54,6 +56,9 @@ Data flows one way: `src/app/[locale]/<route>/page.tsx` → builder (`@builder`)
   and pass `useLocale()` to `formatMoney` / `monthLabel`. User data (category names, notes) is never translated.
 - `AppShell` (root layout) must always render `children`: hiding the page segment on the server breaks Partial
   Prefetching's instant-navigation validation. Put loading gates inside builders instead.
+  The nav bars read the path (`usePathname`), which suspends while prerendering routes with dynamic params
+  (`/projects/[id]`), so each bar sits in its own `<Suspense>` with an un-highlighted fallback. Client containers
+  that read params (`useParams`) need a `<Suspense>` in their builder too (see `ProjectBuilder`).
 - `AppShell` gets the quick-add sheet (`QuickAdd` container) as a `quickAdd` prop from the root layout: a `"use client"`
   file can't import the `@container` barrel, which also exports server-only auth containers. Forms shown in the sheet
   take `onDone` (closes it) and build ids with `useId`, since the same form is also mounted on its page.

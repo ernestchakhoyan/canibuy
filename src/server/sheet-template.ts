@@ -1,4 +1,4 @@
-import type { Budget, Personal } from "@type";
+import type { Budget, Order, Personal } from "@type";
 
 // Builds the Sheets API `spreadsheets.create` body for the template in PRD section 6, in a single request:
 // tabs, headers, frozen + warning-protected row 1, named ranges, a hidden month template and the current month.
@@ -16,6 +16,62 @@ export const personalRows = (p: Personal) => [
 ];
 
 const SHEET_ID = { setup: 0, orders: 1, projects: 2, monthTemplate: 3, currentMonth: 4 } as const;
+
+/** Orders tab header (row 1). `ordersUpdate` writes rows in this column order. */
+export const ORDER_COLUMNS = [
+  "id",
+  "item",
+  "price",
+  "deadline_months",
+  "status",
+  "created",
+  "bought_date",
+  "note",
+  "loan_rate", // empty = Setup's loan_rate
+  "loan_term_months", // empty = Setup's loan_term_months
+];
+
+/**
+ * One `spreadsheets.batchUpdate` request that makes the Orders tab exactly header + `orders`: updateCells with an
+ * open-ended range clears every cell it isn't given, so a removed order's row disappears in the same request.
+ * Text is always written as a string value, never parsed: an item named "=IMPORTXML(…)" must not become a formula.
+ */
+export const ordersUpdate = (orders: Order[]) => {
+  const text = (v: string) => ({ userEnteredValue: { stringValue: v } });
+  const number = (v: number | null) => (v === null ? {} : { userEnteredValue: { numberValue: v } });
+  return {
+    requests: [
+      {
+        updateCells: {
+          range: {
+            sheetId: SHEET_ID.orders,
+            startRowIndex: 0, // header too: sheets made before a column existed get its name
+            startColumnIndex: 0,
+            endColumnIndex: ORDER_COLUMNS.length,
+          },
+          fields: "userEnteredValue",
+          rows: [
+            { values: ORDER_COLUMNS.map(text) },
+            ...orders.map((o) => ({
+              values: [
+                text(o.id),
+                text(o.item),
+                number(o.price),
+                number(o.deadlineMonths),
+                text(o.status),
+                text(o.created),
+                text(o.boughtDate),
+                text(o.note),
+                number(o.loanRate ?? null),
+                number(o.loanTermMonths ?? null),
+              ],
+            })),
+          ],
+        },
+      },
+    ],
+  };
+};
 
 type Value = string | number | boolean | null;
 
@@ -119,7 +175,7 @@ export const buildSpreadsheet = (budget: Budget, month: string) => {
       sheet(SHEET_ID.orders, "Orders", [
         {
           column: 0,
-          rows: [["id", "item", "price", "deadline_months", "status", "created", "bought_date", "note"]],
+          rows: [ORDER_COLUMNS],
         },
       ]),
       sheet(SHEET_ID.projects, "Projects", [

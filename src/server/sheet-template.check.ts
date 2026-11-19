@@ -1,7 +1,7 @@
 // Self-check for the Google Sheet template. Run: bun run test
 import assert from "node:assert/strict";
 import { defaultBudget } from "@helper";
-import { buildSpreadsheet, PERSONAL_RANGE, TEMPLATE_VERSION } from "./sheet-template";
+import { buildSpreadsheet, ORDER_COLUMNS, ordersUpdate, PERSONAL_RANGE, TEMPLATE_VERSION } from "./sheet-template";
 
 const body = buildSpreadsheet(defaultBudget(), "2026-11");
 const titles = body.sheets.map((s) => s.properties.title);
@@ -50,5 +50,30 @@ assert.equal(valueAt(4, 6, 10), "=K2-K3-K4-K5+K6");
 assert.deepEqual(body.sheets[0].data[0].rowData[7].values[1], {
   userEnteredValue: { stringValue: defaultBudget().settings.startMonth },
 });
+
+// Orders sync: same columns as the template header, rows from row 2, user text never parsed as a formula.
+assert.equal(valueAt(1, 0, 0), "id");
+assert.equal(valueAt(1, 0, ORDER_COLUMNS.length - 1), "loan_term_months");
+const sync = ordersUpdate([
+  {
+    id: "o1",
+    item: "=IMPORTXML(1)",
+    price: 500,
+    deadlineMonths: null,
+    status: "Dropped",
+    created: "2026-11-01",
+    boughtDate: "",
+    note: "",
+  },
+]).requests[0].updateCells;
+assert.equal(sync.range.sheetId, body.sheets[1].properties.sheetId);
+assert.equal(sync.range.startRowIndex, 0);
+assert.deepEqual(sync.rows[0].values[0], { userEnteredValue: { stringValue: "id" } }); // header row first
+assert.ok(!("endRowIndex" in sync.range)); // open-ended: rows past the list are cleared
+assert.equal(sync.rows[1].values.length, ORDER_COLUMNS.length);
+assert.deepEqual(sync.rows[1].values[1], { userEnteredValue: { stringValue: "=IMPORTXML(1)" } });
+assert.deepEqual(sync.rows[1].values[3], {});
+assert.deepEqual(sync.rows[1].values[8], {}); // no own loan rate → empty, Setup applies // no deadline → empty cell
+assert.equal(ordersUpdate([]).requests[0].updateCells.rows.length, 1); // header only // removing the last order clears all rows
 
 console.log("sheet template: all checks passed");

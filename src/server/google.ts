@@ -1,7 +1,7 @@
 import "server-only";
 import { defaultBudget, monthOf, todayISO } from "@helper";
-import type { Personal } from "@type";
-import { buildSpreadsheet, PERSONAL_RANGE, personalRows } from "./sheet-template";
+import type { Order, Personal } from "@type";
+import { buildSpreadsheet, ordersUpdate, PERSONAL_RANGE, personalRows } from "./sheet-template";
 
 // Google REST calls over fetch. Every Sheets/Drive call goes through the server; tokens never reach the browser.
 
@@ -69,5 +69,12 @@ export const writePersonal = (accessToken: string, spreadsheetId: string, person
     accessToken,
     { method: "PUT", body: JSON.stringify({ values: personalRows(personal) }) }
   );
+
+/** Makes the Orders tab's rows exactly `orders` (removed orders' rows are cleared), in one request. */
+export const writeOrders = (accessToken: string, spreadsheetId: string, orders: Order[]) =>
+  google(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(ordersUpdate(orders)),
+  });
 
 export const spreadsheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;

@@ -10,7 +10,8 @@
     "projects": "Projects",
     "history": "History",
     "setup": "Setup",
-    "connect": "Connect your Google Sheet"
+    "connect": "Connect your Google Sheet",
+    "project": "Project"
   },
   "nav": {
     "month": "Month",
@@ -26,7 +27,8 @@
   "common": {
     "loading": "Loading your budget…",
     "showAmounts": "Show amounts",
-    "hideAmounts": "Hide amounts"
+    "hideAmounts": "Hide amounts",
+    "syncFailed": "Couldn't save to your Google Sheet. It's saved on this device."
   },
   "connect": {
     "headline": "How much can I save this month, and <em>can I afford this?</em>"
@@ -39,8 +41,7 @@
       "light": "Light",
       "dark": "Dark"
     },
-    "language": "Language",
-    "syncFailed": "Couldn't save to your Google Sheet. It's saved on this device."
+    "language": "Language"
   },
   "income": {
     "addTitle": "Add income",
@@ -185,11 +186,111 @@
       "savedLabel": "Saved toward order",
       "markBought": "Mark bought",
       "drop": "Drop",
-      "boughtOn": "Bought on {date}"
+      "boughtOn": "Bought on {date}",
+      "toProject": "Make it a project",
+      "remove": "Remove {item}"
     },
     "empty": {
       "title": "No orders yet",
       "description": "Add one above to see if you can afford it."
+    },
+    "tabs": {
+      "active": "Active",
+      "bought": "Bought",
+      "dropped": "Dropped",
+      "empty": {
+        "active": "Nothing planned. Check an order above.",
+        "bought": "Nothing bought yet.",
+        "dropped": "Nothing dropped."
+      }
+    },
+    "afford": {
+      "toggle": "How can I afford it?",
+      "months": "{count, plural, one {# month} other {# months}}",
+      "now": {
+        "title": "Your money now",
+        "savings": "Savings",
+        "cushion": "Kept as safety cushion",
+        "canSave": "You can still save this month",
+        "missing": "Still missing",
+        "enough": "Nothing missing"
+      },
+      "monthly": "Each month: {income} income − {bills} bills − {spending} usual spending = {free} free.",
+      "save": {
+        "title": "Save up",
+        "now": "You already have enough: pay from savings and this month's money.",
+        "plan": "Put aside {amount} a month for {months}: ready in {month}.",
+        "never": "Nothing is left over each month after bills and usual spending, so saving up won't get there.",
+        "deadlineFits": "To buy within {months}: put aside {amount} a month. That fits.",
+        "deadlineTooMuch": "To buy within {months} you'd need {amount} a month, more than you have free."
+      },
+      "bank": {
+        "title": "Bank loan at {rate}% a year",
+        "amount": "Borrow {borrow}; your usable savings ({usable}) cover the rest.",
+        "term": "Term",
+        "payment": "Monthly",
+        "interest": "Interest",
+        "share": "Share",
+        "yours": "selected",
+        "percent": "{share, number, percent}",
+        "fitsHint": "Share is the part of your free money the payment takes each month. Bold rows take at most 35%, a safe level."
+      },
+      "friend": {
+        "title": "Borrow from a friend (no interest)",
+        "plan": "Borrow {borrow} and pay back {amount} a month for {months}.",
+        "fastest": "Or pay it all back in {months} with all your free money ({amount} a month).",
+        "saved": "No interest: {amount} less than a bank loan over {months}."
+      },
+      "monthsShort": "{count} mo",
+      "combo": {
+        "title": "Save first, then borrow",
+        "intro": "Put aside all your free money ({amount} a month) for a while, buy, and borrow only what's still missing.",
+        "wait": "Save for",
+        "borrow": "Borrow",
+        "interest": "+{amount} interest",
+        "hint": "Loan over {months} at {rate}% a year. Bold rows take at most 35% of your free money."
+      },
+      "terms": {
+        "rate": "Interest, % a year",
+        "term": "Term, months",
+        "apply": "Apply",
+        "reset": "Use Setup values",
+        "fromSetup": "From Setup",
+        "rateError": "Enter a rate from 0 to 100",
+        "termError": "Enter whole months, 1 to 600"
+      }
+    },
+    "toProject": {
+      "title": "Make it a project",
+      "description": "How will you pay for {item}?",
+      "create": "Create project",
+      "total": "Total {amount}",
+      "tooMuch": "The payment takes more than 35% of your free money.",
+      "now": {
+        "label": "Pay now",
+        "detail": "{price} now, from savings and this month's money."
+      },
+      "save": {
+        "label": "Save up",
+        "detail": "{price} in {month}, after saving for {months}."
+      },
+      "bank": {
+        "label": "Bank loan",
+        "detail": "{hasDown, select, yes {{down} from savings now, then } other {}}{payment} a month for {months} at {rate}%."
+      },
+      "combo": {
+        "label": "Save {months}, then borrow",
+        "detail": "{down} from savings in {month}, then {payment} a month for {months} at {rate}%."
+      },
+      "friend": {
+        "label": "Borrow from a friend",
+        "detail": "{hasDown, select, yes {{down} from savings now, then } other {}}{payment} a month for {months}, no interest."
+      },
+      "parts": {
+        "fromSavings": "From savings",
+        "loan": "Loan payment {i}/{n}",
+        "friend": "Repay friend {i}/{n}"
+      }
     }
   },
   "projects": {
@@ -215,7 +316,6 @@
       "notAffordable": "Not affordable without a loan within 10 years.",
       "paidOn": "Paid {date}",
       "paymentMonth": "Payment month for {name}",
-      "pay": "Pay",
       "remove": "Remove {name}"
     },
     "table": {
@@ -228,6 +328,76 @@
     "empty": {
       "title": "No projects yet",
       "description": "Plan multi-month spending, like a renovation, above."
+    },
+    "start": {
+      "started": "Started",
+      "action": "Start project",
+      "range": "{from} – {to}",
+      "billShort": "{amount}/mo, {range}",
+      "bill": "{name}: {amount}/mo, {range}",
+      "billName": {
+        "bank": "{project} · loan",
+        "friend": "{project} · friend"
+      },
+      "startedOn": "Started on {date}.",
+      "explain": "It's a plan for now. Start it when you begin; then you can pay its parts.",
+      "explainLoan": "It's a plan for now. Starting it turns the monthly payments into a recurring bill ({bills}); then you can pay its other parts."
+    },
+    "pay": {
+      "action": "Pay",
+      "question": "Pay {amount} from…",
+      "savings": "Savings",
+      "savingsAll": "All from savings, the safety cushion stays",
+      "savingsSplit": "{savings} from savings, {month} from this month (the cushion stays)",
+      "noSavings": "No savings above the safety cushion",
+      "month": "This month's money",
+      "monthLeft": "{left} left this month → {after} after",
+      "cancel": "Cancel"
+    },
+    "tabs": {
+      "all": "All",
+      "inactive": "Inactive",
+      "active": "Active",
+      "completed": "Completed",
+      "archived": "Archived"
+    },
+    "status": {
+      "inactive": "Inactive",
+      "active": "Active",
+      "completed": "Completed",
+      "archived": "Archived"
+    },
+    "progress": {
+      "label": "Payment progress",
+      "paid": "Paid {paid} of {total}",
+      "percent": "{progress, number, percent}"
+    },
+    "list": {
+      "create": "Create project",
+      "createHint": "It starts as a plan; start it when you begin.",
+      "left": "{amount} left",
+      "next": "Next: {amount} in {month}",
+      "bill": "{amount}/mo bill until {month}",
+      "empty": {
+        "all": "No projects yet.",
+        "inactive": "No plans waiting to start.",
+        "active": "Nothing in progress.",
+        "completed": "Nothing finished yet.",
+        "archived": "Nothing archived."
+      }
+    },
+    "details": {
+      "back": "All projects",
+      "notFound": "This project doesn't exist anymore.",
+      "parts": "Parts"
+    },
+    "actions": {
+      "archive": "Archive",
+      "restore": "Restore",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this project and its parts? This can't be undone.",
+      "deleteYes": "Delete",
+      "cancel": "Cancel"
     }
   },
   "setup": {
@@ -253,7 +423,8 @@
       "dueDay": "Due day",
       "category": "Category",
       "add": "Add bill",
-      "amountError": "Enter an amount above 0"
+      "amountError": "Enter an amount above 0",
+      "range": "{from} – {to}"
     },
     "categories": {
       "title": "Categories",

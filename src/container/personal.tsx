@@ -39,6 +39,7 @@ const MODES = [
 /** Appearance and language. Both apply at once, on this device and in the "Personal" block of the sheet. */
 export function PersonalForm() {
   const t = useTranslations("personal");
+  const tc = useTranslations("common");
   const b = useLoadedBudget();
   const locale = useLocale(); // what's on screen, from the cookie; may differ from the budget on a new device
   const [syncFailed, setSyncFailed] = useState(false);
@@ -94,7 +95,7 @@ export function PersonalForm() {
             </SelectContent>
           </Select>
         </Field>
-        {syncFailed && <FieldError>{t("syncFailed")}</FieldError>}
+        {syncFailed && <FieldError>{tc("syncFailed")}</FieldError>}
       </div>
     </Card>
   );

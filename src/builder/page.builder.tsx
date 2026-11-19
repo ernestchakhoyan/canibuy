@@ -13,7 +13,7 @@ import {
   OrderForm,
   OrderList,
   PersonalForm,
-  ProjectForm,
+  ProjectDetails,
   ProjectList,
   SavingsForm,
   SavingsHistory,
@@ -21,7 +21,7 @@ import {
   SettingsForm,
 } from "@container";
 import { BudgetGate } from "@layout";
-import { Logo } from "@widget";
+import { Card, Logo, Skeleton } from "@widget";
 import { getTranslations } from "next-intl/server";
 import { type ReactNode, Suspense, ViewTransition } from "react";
 
@@ -35,6 +35,16 @@ const Screen = ({ children }: { children: ReactNode }) => (
   <ViewTransition enter="page-enter" exit="page-exit" default="none">
     {children}
   </ViewTransition>
+);
+
+const ProjectSkeleton = () => (
+  <>
+    <Skeleton className="h-8 w-1/2 motion-reduce:animate-none" />
+    <Card>
+      <Skeleton className="h-2 w-full motion-reduce:animate-none" />
+      <Skeleton className="h-11 w-full motion-reduce:animate-none" />
+    </Card>
+  </>
 );
 
 type PageKey = "month" | "income" | "savings" | "orders" | "projects" | "history" | "setup";
@@ -83,9 +93,22 @@ export const OrdersBuilder = () => (
 
 export const ProjectsBuilder = () => (
   <Page title="projects">
-    <ProjectForm />
     <ProjectList />
   </Page>
+);
+
+/**
+ * /projects/[id]. The id is only known at request time and the project lives in the browser's budget, so the client
+ * container reads it with `useParams`, which suspends during prerendering: hence the Suspense boundary.
+ */
+export const ProjectBuilder = () => (
+  <Screen>
+    <BudgetGate>
+      <Suspense fallback={<ProjectSkeleton />}>
+        <ProjectDetails />
+      </Suspense>
+    </BudgetGate>
+  </Screen>
 );
 
 export const HistoryBuilder = () => (
