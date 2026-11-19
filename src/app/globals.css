@@ -148,6 +148,24 @@
   }
 }
 
+/*
+ * The header and bottom tab bar (view-transition-name in app-shell.tsx) stay put, drawn above the page cross-fade:
+ * otherwise the fading page snapshots, which the browser paints over everything, cover them mid-switch.
+ */
+::view-transition-group(app-header),
+::view-transition-group(app-nav) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(app-header),
+::view-transition-old(app-nav) {
+  display: none;
+}
+::view-transition-new(app-header),
+::view-transition-new(app-nav) {
+  animation: none;
+}
+
 /* Route cross-fade (`Screen` in page.builder.tsx): opacity only, the old page leaves fast. */
 ::view-transition {
   pointer-events: none;

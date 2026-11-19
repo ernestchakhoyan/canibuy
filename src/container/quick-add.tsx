@@ -67,7 +67,8 @@ export function QuickAdd() {
         <div className="overflow-y-auto px-4 pb-4">
           {current ? (
             // The sheet header already names the form: drop the form card's own frame and title.
-            <div className="[&_[data-slot=card]]:bg-transparent [&_[data-slot=card]]:py-0 [&_[data-slot=card]]:ring-0 [&_[data-slot=card-content]]:px-0 [&_[data-slot=card-header]]:hidden">
+            <div className="[&_[data-slot=card]]:overflow-visible [&_[data-slot=card]]:bg-transparent [&_[data-slot=card]]:py-0 [&_[data-slot=card]]:ring-0 [&_[data-slot=card-content]]:px-0 [&_[data-slot=card-header]]:hidden">
+              {/* overflow-visible: with its padding gone, the card's clipping cut the edge buttons' borders and rings. */}
               <BudgetGate>
                 <current.Form onDone={() => setOpen(false)} />
               </BudgetGate>

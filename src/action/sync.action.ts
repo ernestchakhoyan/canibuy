@@ -1,6 +1,16 @@
 "use server";
 
-import { auth, googleAccessToken, readSheet, writeBills, writeEntries, writeSavings, writeSetup } from "@server";
+import { defaultBudget, monthOf, todayISO } from "@helper";
+import {
+  auth,
+  googleAccessToken,
+  readSheet,
+  resetSheet,
+  writeBills,
+  writeEntries,
+  writeSavings,
+  writeSetup,
+} from "@server";
 import type { Bill, Category, CurrencyCode, Entry, EntryType, Saving, Settings } from "@type";
 
 const MAX_ROWS = 20_000;
@@ -145,6 +155,17 @@ export async function saveSavings(savings: Saving[]) {
     sheet.spreadsheetId,
     savings.map(({ id, name, amount, currency }) => ({ id, name, amount, currency }))
   );
+  return true;
+}
+
+/**
+ * Start over: empties the connected sheet (data tabs, past months; Setup back to the standard settings). Built on
+ * the server from defaults only: nothing from the browser goes into this write. `false` when no sheet is connected.
+ */
+export async function startOverSheet() {
+  const sheet = await connectedSheet();
+  if (!sheet) return false;
+  await resetSheet(sheet.accessToken, sheet.spreadsheetId, monthOf(todayISO()), defaultBudget());
   return true;
 }
 

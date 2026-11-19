@@ -1,6 +1,6 @@
 import "server-only";
 import { defaultBudget, monthOf, todayISO } from "@helper";
-import type { Bill, Category, Entry, Order, Personal, Project, ProjectPart, Saving, Settings } from "@type";
+import type { Bill, Budget, Category, Entry, Order, Personal, Project, ProjectPart, Saving, Settings } from "@type";
 import {
   billNamedRanges,
   billsUpdate,
@@ -10,6 +10,7 @@ import {
   parseSheet,
   personalUpdate,
   projectsUpdate,
+  resetRequests,
   SHEET_ID,
   savingsUpdate,
   setupUpdate,
@@ -168,6 +169,13 @@ export const writeSetup = async (
   const setup = meta.idOf("Setup");
   if (setup === undefined) throw new Error("The sheet has no Setup tab");
   await batchUpdate(accessToken, spreadsheetId, setupUpdate(setup, settings, categories));
+};
+
+/** Empties the sheet for a fresh start (see `resetRequests`), with `budget`'s settings and categories in Setup. */
+export const resetSheet = async (accessToken: string, spreadsheetId: string, month: string, budget: Budget) => {
+  const meta = await sheetMeta(accessToken, spreadsheetId);
+  const requests = resetRequests(meta.tabs, month, budget);
+  if (requests.length > 0) await batchUpdate(accessToken, spreadsheetId, requests);
 };
 
 /** Makes the Savings tab exactly `savings`, creating the tab on sheets made before it existed. */

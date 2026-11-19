@@ -5,6 +5,7 @@ import {
   cn,
   formatMoney,
   haptic,
+  type Lender,
   monthLabel,
   monthOf,
   monthSummary,
@@ -193,7 +194,7 @@ function ProjectStart({ projectId, project }: { projectId: string; project: stri
   const money = (n: number) => formatMoney(Math.round(n), b.settings.currency, locale);
   const range = (from?: string, to?: string) =>
     t("range", { from: monthLabel(from ?? "", locale), to: monthLabel(to ?? "", locale) });
-  const billName = (lender: "bank" | "friend") => t(`billName.${lender}`, { project });
+  const billName = (lender: Lender, part: string) => t(`billName.${lender}`, { project: part || project });
 
   if (projectStarted(b, projectId)) {
     const bills = b.bills.filter((bill) => bill.projectId === projectId);

@@ -8,21 +8,24 @@ import {
   saveProjects,
   saveSavings,
   saveSetup,
+  startOverSheet,
 } from "@action";
 import {
+  applyProjectStart,
   baseCurrency,
   convertBudget,
   currencyOfSymbol,
   defaultBudget,
   fromSavings,
   INITIAL_SYNC_META,
+  type Lender,
   mergeFromSheet,
   newId,
   type PaySource,
   paymentSplit,
-  projectStart,
   projectStarted,
   projectsOf,
+  repairProjects,
   SHEET_TABS,
   type SheetTab,
   BUDGET_STORAGE_KEY as STORAGE_KEY,
@@ -44,7 +47,8 @@ const load = (): Budget => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     // Spread over the defaults so budgets saved before a field existed (e.g. `personal`) still load.
-    if (saved) return { ...defaultBudget(), ...(JSON.parse(saved) as Budget) };
+    // repairProjects: older started projects get the monthly payments Start creates now.
+    if (saved) return repairProjects({ ...defaultBudget(), ...(JSON.parse(saved) as Budget) }, todayISO());
   } catch {}
   return defaultBudget();
 };
@@ -122,8 +126,12 @@ const setSyncFailed = (tab: SheetTab, failed: boolean) => {
   for (const listener of listeners) listener();
 };
 
+/** Set while starting over: no new sheet writes, so nothing old lands after the sheet was emptied. */
+let resetting = false;
+
 /** Queues a write of `tab`; it's clean again only if no newer change came in meanwhile. */
 const syncTab = (tab: SheetTab) => {
+  if (resetting) return Promise.resolve();
   const sync = sheetSync[tab];
   const version = ++sync.version;
   setDirty(tab, true);
@@ -163,6 +171,9 @@ const startSession = async () => {
   // Re-read `dirty`: anything changed while the sheet was being read stays as it is here.
   state = mergeFromSheet(getBudget(), data, readMeta().dirty);
   persist();
+  // Older started projects get their monthly payments, written to the sheet so every device has the same parts.
+  const repaired = repairProjects(getBudget(), todayISO());
+  if (repaired !== getBudget()) update(() => repaired);
   refreshRates(); // the sheet may have brought savings in other currencies
   writeMeta((m) => ({ ...m, uploaded: SHEET_TABS })); // from now on the sheet leads for every tab
   // The language from the sheet differs from the one on screen: switch (the server renders pages per locale).
@@ -224,6 +235,26 @@ const upsertProject = (b: Budget, projectId: string, change: Partial<Project>): 
 });
 
 export const budgetActions = {
+  /**
+   * Start over: empties the sheet, then this device (everything but appearance and language), and reloads.
+   * Queued writes finish first and new ones stop, so no old data lands in the emptied sheet. Resolves `false`,
+   * changing nothing, when the sheet couldn't be emptied (no connection, Google failed).
+   */
+  startOver: async () => {
+    resetting = true;
+    await Promise.all(SHEET_TABS.map((tab) => sheetSync[tab].queue));
+    const ok = await startOverSheet().catch(() => false);
+    if (!ok) {
+      resetting = false;
+      return false;
+    }
+    const personal = getBudget().personal;
+    state = { ...defaultBudget(), personal };
+    persist();
+    writeMeta(() => ({ uploaded: SHEET_TABS, dirty: [] })); // the device now matches the (empty) sheet
+    location.reload();
+    return true;
+  },
   /**
    * Switches the base currency to `symbol`, converting every base amount at today's rate (see `convertBudget`).
    * Resolves `false`, changing nothing, when there's no rate between the two (offline / source down). A custom
@@ -362,15 +393,12 @@ export const budgetActions = {
    * Starts a project: records today as its start and replaces its instalments with a recurring bill per lender
    * (see `projectStart`). Nothing is paid; `billName` names the bill in the user's language.
    */
-  startProject: (projectId: string, billName: (lender: "bank" | "friend") => string) =>
+  startProject: (projectId: string, billName: (lender: Lender, part: string) => string) =>
     update((b) => {
       const today = todayISO();
-      const plan = projectStart(b, projectId, today, billName);
-      return {
-        ...upsertProject(b, projectId, { startedDate: today }),
-        parts: b.parts.filter((p) => !plan.remove.includes(p.partId)),
-        bills: [...b.bills, ...plan.bills.map((bill) => ({ ...bill, id: newId() }))],
-      };
+      // Monthly payments (loan instalments, later parts split by month) stay parts to pay one by one; their
+      // recurring bills put them in every month's budget.
+      return applyProjectStart(upsertProject(b, projectId, { startedDate: today }), projectId, today, billName, newId);
     }),
   /** Archives (hides from the active tabs) or restores a project; nothing about its money changes. */
   archiveProject: (projectId: string, archived: boolean) =>
@@ -394,6 +422,9 @@ export const budgetActions = {
       if (!part || part.status === "Paid") return b;
       const { savings } = paymentSplit(b, part.cost, partId, source);
       const note = `${part.project}: ${part.part}`;
+      // A started loan's monthly payment is already in the month's bills: record it as that bill being paid, not
+      // as a new expense, so it isn't counted twice.
+      const billed = part.installment && b.bills.some((bill) => bill.projectId === part.projectId && bill.active);
       return {
         ...b,
         entries: [
@@ -401,7 +432,7 @@ export const budgetActions = {
           ...(savings > 0
             ? [entry({ type: "withdrawal", amount: savings, category: "Home", note, linkId: partId })]
             : []),
-          entry({ type: "expense", amount: part.cost, category: "Home", note, linkId: partId }),
+          entry({ type: billed ? "bill_paid" : "expense", amount: part.cost, category: "Home", note, linkId: partId }),
         ],
         parts: b.parts.map((p) => (p.partId === partId ? { ...p, status: "Paid", paidDate: todayISO() } : p)),
       };

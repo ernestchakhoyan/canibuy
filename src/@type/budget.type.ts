@@ -76,8 +76,11 @@ export type ProjectPart = {
   payMonth: string; // YYYY-MM
   status: "Planned" | "Paid";
   paidDate: string;
-  /** A monthly loan / friend repayment; starting the project turns these into one recurring bill. */
-  installment?: "bank" | "friend";
+  /**
+   * One monthly payment: a loan / friend repayment, or ("saving") a share of a later part split over the months
+   * up to it when the project starts. Each lender's / part's payments are one recurring bill.
+   */
+  installment?: "bank" | "friend" | "saving";
   /** YYYY-MM-DD the project was started (same on all its parts); missing = not started, still a plan. */
   startedDate?: string;
 };

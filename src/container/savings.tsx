@@ -89,7 +89,8 @@ export function SavingsForm({ onDone }: { onDone?: () => void }) {
     <Card title={t("moveTitle")}>
       <form onSubmit={submit}>
         <FieldGroup className="grid grid-cols-2 gap-4">
-          <Field data-invalid={!!error || undefined}>
+          {/* Full width when there's no order to save toward (the order picker is hidden then). */}
+          <Field data-invalid={!!error || undefined} className={openOrders.length === 0 ? "col-span-2" : undefined}>
             <FieldLabel htmlFor={`${id}-amount`}>{t("amount")}</FieldLabel>
             <Input
               id={`${id}-amount`}
@@ -101,17 +102,19 @@ export function SavingsForm({ onDone }: { onDone?: () => void }) {
               aria-invalid={!!error || undefined}
             />
           </Field>
-          <Field data-disabled={openOrders.length === 0 || undefined}>
-            <FieldLabel htmlFor={`${id}-order`}>{t("forOrder")}</FieldLabel>
-            <NativeSelect id={`${id}-order`} name="order" className="w-full" disabled={openOrders.length === 0}>
-              <NativeSelectOption value="">{t("none")}</NativeSelectOption>
-              {openOrders.map((o) => (
-                <NativeSelectOption key={o.id} value={o.id}>
-                  {o.item}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Field>
+          {openOrders.length > 0 && (
+            <Field>
+              <FieldLabel htmlFor={`${id}-order`}>{t("forOrder")}</FieldLabel>
+              <NativeSelect id={`${id}-order`} name="order" className="w-full">
+                <NativeSelectOption value="">{t("none")}</NativeSelectOption>
+                {openOrders.map((o) => (
+                  <NativeSelectOption key={o.id} value={o.id}>
+                    {o.item}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
           <Field className="col-span-2">
             <FieldLabel htmlFor={`${id}-note`}>{t("note")}</FieldLabel>
             <Input id={`${id}-note`} name="note" placeholder={t("optional")} />

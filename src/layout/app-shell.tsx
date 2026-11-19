@@ -57,7 +57,8 @@ function Header({ pathname }: { pathname: string | null }) {
   const t = useTranslations("nav");
   if (pathname !== null && NO_NAV.includes(pathname)) return null;
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-background/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
+    // view-transition-name: its own layer above the page cross-fade (globals.css), so pages never cover it.
+    <header className="sticky top-0 z-10 flex [view-transition-name:app-header] items-center justify-between gap-2 bg-background/80 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-lg">
       <Link href="/" onClick={haptic} className="flex h-14 items-center">
         <Logo />
       </Link>
@@ -96,24 +97,26 @@ function BottomNav({ pathname, quickAdd }: { pathname: string | null; quickAdd: 
     const active = isActive(pathname, href);
     return (
       <li key={href} className="flex-1">
+        {/* Icon only: the name is the link's accessible name (and a tooltip), not shown. */}
         <Link
           href={href}
           onClick={haptic}
+          aria-label={t(label)}
+          title={t(label)}
           aria-current={active ? "page" : undefined}
           className={cn(
-            "flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors",
+            "flex min-h-16 items-center justify-center px-1 transition-colors",
             active ? "text-primary" : "text-muted-foreground hover:text-foreground"
           )}
         >
           <span
             className={cn(
-              "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
+              "flex h-11 w-16 items-center justify-center rounded-xl transition-colors",
               active && "bg-primary/12"
             )}
           >
-            <Icon className="size-5" aria-hidden="true" />
+            <Icon className="size-6" aria-hidden="true" />
           </span>
-          {t(label)}
         </Link>
       </li>
     );
@@ -122,7 +125,7 @@ function BottomNav({ pathname, quickAdd }: { pathname: string | null; quickAdd: 
   return (
     <nav
       aria-label={t("main")}
-      className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg"
+      className="fixed inset-x-0 bottom-0 z-10 border-t [view-transition-name:app-nav] bg-card/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg"
     >
       <ul className="mx-auto flex max-w-2xl items-center px-2">
         {TABS[0].map(tab)}

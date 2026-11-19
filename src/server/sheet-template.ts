@@ -436,6 +436,38 @@ export const personalUpdate = (sheetId: number, personal: Personal) =>
     PERSONAL_COLUMN
   ).requests;
 
+// ── Start over ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Requests that empty the sheet for a fresh start: Orders, Projects, Bills and Savings keep only their header,
+ * every month tab but `month` is deleted and `month`'s ledger emptied (its summary stays), and Setup gets `budget`'s
+ * settings and categories. The Personal block is left alone. Tabs that don't exist are skipped.
+ */
+export const resetRequests = (tabs: { title: string; sheetId: number }[], month: string, budget: Budget) => {
+  const idOf = (title: string) => tabs.find((t) => t.title === title)?.sheetId;
+  const requests: object[] = [];
+  for (const [title, columns] of [
+    ["Orders", ORDER_COLUMNS],
+    ["Projects", PROJECT_COLUMNS],
+    ["Bills", BILL_COLUMNS],
+    ["Savings", SAVING_COLUMNS],
+  ] as const) {
+    const sheetId = idOf(title);
+    if (sheetId !== undefined) requests.push(...tabUpdate(sheetId, [...columns], []).requests);
+  }
+  for (const tab of tabs) {
+    if (!MONTH_TITLE.test(tab.title)) continue;
+    requests.push(
+      ...(tab.title === month
+        ? tabUpdate(tab.sheetId, ENTRY_COLUMNS, []).requests
+        : [{ deleteSheet: { sheetId: tab.sheetId } }])
+    );
+  }
+  const setup = idOf("Setup");
+  if (setup !== undefined) requests.push(...setupUpdate(setup, budget.settings, budget.categories));
+  return requests;
+};
+
 // ── Reading the sheet back ───────────────────────────────────────────────────────────────────────────────────
 
 type Raw = string | number | boolean | undefined | null;
@@ -524,7 +556,7 @@ export const parseSheet = (tables: {
       payMonth: str(r.pay_month),
       status,
       paidDate: str(r.paid_date),
-      ...(installment === "bank" || installment === "friend" ? { installment } : {}),
+      ...(installment === "bank" || installment === "friend" || installment === "saving" ? { installment } : {}),
     });
   }
 

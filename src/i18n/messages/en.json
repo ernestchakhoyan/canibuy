@@ -363,7 +363,8 @@
       "bill": "{name}: {amount}/mo, {range}",
       "billName": {
         "bank": "{project} · loan",
-        "friend": "{project} · friend"
+        "friend": "{project} · friend",
+        "saving": "{project} · monthly"
       },
       "startedOn": "Started on {date}.",
       "explain": "It's a plan for now. Start it when you begin; then you can pay its parts.",
@@ -464,6 +465,14 @@
       "amd": "Armenian dram",
       "usd": "US dollar",
       "eur": "Euro"
+    },
+    "startOver": {
+      "title": "Start over",
+      "explain": "Deletes everything (orders, projects, bills, savings, entries and past months) from your Google Sheet and this device, and puts the settings back to the start. Appearance and language stay. This can't be undone.",
+      "action": "Hold for 15 seconds to start over",
+      "holding": "Keep holding… {seconds, plural, one {# second} other {# seconds}}",
+      "working": "Starting over…",
+      "failed": "Couldn't empty your Google Sheet, so nothing was deleted. Check your connection and try again."
     }
   },
   "auth": {
@@ -516,5 +525,29 @@
   },
   "sheet": {
     "close": "Close"
+  },
+  "setupSections": {
+    "label": "Settings sections",
+    "back": "Settings",
+    "personal": {
+      "title": "Appearance & language",
+      "hint": "Theme and the app's language"
+    },
+    "money": {
+      "title": "Money basics",
+      "hint": "Currency, income, savings, safety cushion, loans"
+    },
+    "bills": {
+      "title": "Recurring bills",
+      "hint": "Rent, utilities, loan payments…"
+    },
+    "categories": {
+      "title": "Categories",
+      "hint": "How your expenses are grouped"
+    },
+    "account": {
+      "title": "Account & data",
+      "hint": "Google Sheet connection, start over"
+    }
   }
 }

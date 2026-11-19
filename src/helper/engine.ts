@@ -419,12 +419,14 @@ export const projectSummary = (b: Budget, project: Project, today: string) => {
   const parts = b.parts.filter((p) => p.projectId === project.id);
   // A bill without an end month (only from manual edits) has no "left" to count.
   const bills = b.bills.filter((bill) => bill.projectId === project.id && bill.active && bill.endMonth);
+  // Instalment parts track the bill's payments one by one: then they carry the money, the bill is only shown.
+  const billMoney = parts.some((p) => p.installment) ? [] : bills;
   const planned = parts.filter((p) => p.status === "Planned");
-  const billsPaid = bills.reduce(
+  const billsPaid = billMoney.reduce(
     (t, bill) => t + bill.amount * billMonthsBetween(bill, bill.startMonth ?? month, addMonths(month, -1)),
     0
   );
-  const billsLeft = bills.reduce(
+  const billsLeft = billMoney.reduce(
     (t, bill) => t + bill.amount * billMonthsBetween(bill, month, bill.endMonth ?? month),
     0
   );
@@ -434,7 +436,7 @@ export const projectSummary = (b: Budget, project: Project, today: string) => {
   const next =
     [
       ...planned.map((p) => ({ month: p.payMonth < month ? month : p.payMonth, amount: p.cost })),
-      ...bills
+      ...billMoney
         .filter((bill) => (bill.endMonth ?? month) >= month)
         .map((bill) => ({
           month: bill.startMonth && bill.startMonth > month ? bill.startMonth : month,
@@ -454,38 +456,157 @@ export const projectSummary = (b: Budget, project: Project, today: string) => {
   return { project, status, started, parts, bills, paid, left, total, progress: total > 0 ? paid / total : 0, next };
 };
 
+export type Lender = NonNullable<ProjectPart["installment"]>;
+
 /**
- * What starting a project changes besides marking it started: each lender's instalments become one recurring bill
- * from the first to the last instalment month (amount = the instalment; due on today's day, capped at 28 so it
- * exists every month). Nothing is paid: the user pays each part, choosing where the money comes from.
+ * What starting a project changes besides marking it started:
+ * - loan / friend instalments: one recurring bill per lender, over the instalments' months;
+ * - every planned part due after this month: split into equal monthly payments from this month to its month
+ *   (the last one takes the rounding), with its own recurring bill. Each payment is then paid on its own.
+ * Bills are due on today's day, capped at 28 so it exists every month. `name(lender, partName)` names a bill.
  */
 export const projectStart = (
   b: Budget,
   projectId: string,
   today: string,
-  billName: (lender: "bank" | "friend") => string
+  name: (lender: Lender, part: string) => string
 ) => {
-  const installments = b.parts.filter((p) => p.projectId === projectId && p.status === "Planned" && p.installment);
-  const lenders = [...new Set(installments.map((p) => p.installment as "bank" | "friend"))];
+  const month = monthOf(today);
+  const dueDay = Math.min(28, Number(today.slice(8, 10)));
+  const planned = b.parts.filter((p) => p.projectId === projectId && p.status === "Planned");
+  const bill = (lender: Lender, payments: ProjectPart[], label: string) => {
+    const months = payments.map((p) => p.payMonth).sort();
+    return {
+      name: name(lender, label),
+      amount: payments[0].cost,
+      dueDay,
+      category: "Other",
+      active: true,
+      startMonth: months[0],
+      endMonth: months[months.length - 1],
+      projectId,
+      project: payments[0].project,
+    } satisfies Omit<Bill, "id">;
+  };
+
+  const loans = planned.filter((p) => p.installment);
+  const lenders = [...new Set(loans.map((p) => p.installment as Lender))];
+
+  const split = planned
+    .filter((p) => !p.installment && p.payMonth > month)
+    .map((part) => {
+      const count = monthsBetween(month, part.payMonth);
+      const round = part.cost >= 1000 ? Math.round : cents; // whole units for big amounts, cents for small ones
+      const share = round(part.cost / count);
+      const payments: ProjectPart[] = Array.from({ length: count }, (_, i) => ({
+        ...part,
+        partId: `${part.partId}-${i + 1}`,
+        part: `${part.part} ${i + 1}/${count}`,
+        cost: i < count - 1 ? share : cents(part.cost - share * (count - 1)),
+        payMonth: addMonths(month, i),
+        installment: "saving" as const,
+      }));
+      return { from: part.partId, payments, bill: bill("saving", payments, part.part) };
+    });
+
   return {
-    remove: installments.map((p) => p.partId),
-    bills: lenders.map((lender) => {
-      const own = installments.filter((p) => p.installment === lender);
-      const months = own.map((p) => p.payMonth).sort();
-      return {
-        name: billName(lender),
-        amount: own[0].cost,
-        dueDay: Math.min(28, Number(today.slice(8, 10))),
-        category: "Other",
-        active: true,
-        startMonth: months[0],
-        endMonth: months[months.length - 1],
-        projectId,
-        project: own[0].project,
-      } satisfies Omit<Bill, "id">;
-    }),
+    split,
+    bills: [
+      ...lenders.map((lender) =>
+        bill(
+          lender,
+          loans.filter((p) => p.installment === lender),
+          ""
+        )
+      ),
+      ...split.map((s) => s.bill),
+    ],
   };
 };
+
+/** Months from `from` to `to`, both counted. */
+const monthsBetween = (from: string, to: string) => {
+  let count = 0;
+  for (let m = from; m <= to; m = addMonths(m, 1)) count++;
+  return count;
+};
+
+/**
+ * The budget after starting a project (see `projectStart`): split parts replaced by their monthly payments
+ * (money saved toward a split part moves to its first payment), the bills added with ids from `billId`.
+ */
+export const applyProjectStart = (
+  b: Budget,
+  projectId: string,
+  today: string,
+  name: (lender: Lender, part: string) => string,
+  billId: (index: number) => string
+): Budget => {
+  const { split, bills } = projectStart(b, projectId, today, name);
+  const first = new Map(split.map((s) => [s.from, s.payments[0].partId]));
+  return {
+    ...b,
+    parts: b.parts.flatMap((p) => split.find((s) => s.from === p.partId)?.payments ?? [p]),
+    entries: b.entries.map((e) => (first.has(e.linkId) ? { ...e, linkId: first.get(e.linkId) ?? e.linkId } : e)),
+    bills: [...b.bills, ...bills.map((bill, i) => ({ ...bill, id: billId(i) }))],
+  };
+};
+
+/**
+ * Started projects whose monthly payments became a bill with no payment parts left (started before Start kept
+ * them) get them back from the bill: one unpaid part per month from its start to its end month. Part ids derive
+ * from the bill's, so two devices repairing the same project create the same parts.
+ */
+export const restoreInstallments = (b: Budget): Budget => {
+  const added: ProjectPart[] = [];
+  for (const bill of b.bills) {
+    const { projectId, startMonth, endMonth } = bill;
+    if (!projectId || !startMonth || !endMonth || endMonth < startMonth) continue;
+    if (b.parts.some((p) => p.projectId === projectId && p.installment)) continue;
+    const months: string[] = [];
+    for (let m = startMonth; m <= endMonth && months.length < 600; m = addMonths(m, 1)) months.push(m);
+    months.forEach((payMonth, i) => {
+      added.push({
+        projectId,
+        project: bill.project ?? bill.name,
+        partId: `${bill.id}-${i + 1}`,
+        part: `${bill.name} ${i + 1}/${months.length}`,
+        cost: bill.amount,
+        payMonth,
+        status: "Planned",
+        paidDate: "",
+        installment: "bank",
+      });
+    });
+  }
+  return added.length > 0 ? { ...b, parts: [...b.parts, ...added] } : b;
+};
+
+/**
+ * Projects started before Start split later parts into monthly payments (started, no bill yet, a part due after
+ * this month) get split now, as if started today. Ids derive from the project's, so devices agree.
+ */
+export const splitStartedProjects = (b: Budget, today: string): Budget => {
+  let next = b;
+  for (const project of projectsOf(b)) {
+    if (!project.startedDate || next.bills.some((bill) => bill.projectId === project.id)) continue;
+    const later = next.parts.some(
+      (p) => p.projectId === project.id && p.status === "Planned" && !p.installment && p.payMonth > monthOf(today)
+    );
+    if (!later) continue;
+    next = applyProjectStart(
+      next,
+      project.id,
+      today,
+      (_, part) => part || project.name,
+      (i) => `${project.id}-b${i + 1}`
+    );
+  }
+  return next;
+};
+
+/** Everything older data needs to match how started projects work now. */
+export const repairProjects = (b: Budget, today: string) => splitStartedProjects(restoreInstallments(b), today);
 
 /**
  * Where a payment's money comes from. "savings": as much as savings allow without touching the cushion (plus what
@@ -509,8 +630,13 @@ export const projectPlan = (b: Budget, projectId: string, today: string) => {
   const payMonth = (m: string) => (m < current ? current : m);
   const last = parts.reduce((max, p) => (payMonth(p.payMonth) > max ? payMonth(p.payMonth) : max), current);
   const avg = averageEveryday(b, current);
-  const startBalance = usableSavings(b) + monthSummary(b, today).canStillSave;
-  const freeIn = (m: string) => monthIncome(b, m) - monthBills(b, m) - avg;
+  // A started project's bill is already subtracted from every month; its unpaid instalment parts are paid below,
+  // so add the bill back in those months (the same money, counted once).
+  const billed = b.bills.some((bill) => bill.projectId === projectId && bill.active);
+  const instalmentsIn = (m: string) =>
+    billed ? parts.filter((p) => p.installment && payMonth(p.payMonth) === m).reduce((t, p) => t + p.cost, 0) : 0;
+  const startBalance = usableSavings(b) + monthSummary(b, today).canStillSave + instalmentsIn(current);
+  const freeIn = (m: string) => monthIncome(b, m) - monthBills(b, m) + instalmentsIn(m) - avg;
 
   const months: PlanMonth[] = [];
   let balance = startBalance;

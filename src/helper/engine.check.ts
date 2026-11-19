@@ -19,8 +19,11 @@ import {
   projectStarted,
   projectSummary,
   projectsOf,
+  repairProjects,
+  restoreInstallments,
   savingsAccounts,
   savingsBalance,
+  splitStartedProjects,
   toBase,
   usableSavings,
 } from "./engine";
@@ -187,8 +190,7 @@ assert.equal(
   true
 );
 const start = projectStart(started, "car", "2026-11-30", (lender) => `Car · ${lender}`);
-assert.equal(start.remove.length, 12); // the 12 instalments; the savings part stays, to be paid by hand
-assert.ok(!start.remove.includes("c0"));
+assert.equal(start.bills.length, 1); // one bill per lender; the instalment parts stay, to be paid one by one
 assert.deepEqual(start.bills, [
   {
     name: "Car · bank",
@@ -403,5 +405,70 @@ assert.equal(convertBudget(budget, 1 / 359.0876, "$").bills[0].amount, 1.39); //
 // Same money, new currency: the savings balance in AMD = the USD one × 400 (at a matching AMD-based rate).
 const amdRates = { base: "AMD" as const, date: "2026-11-19", perBase: { USD: 1 / 400, EUR: 0.8 / 400 } };
 assert.equal(Math.round(savingsBalance({ ...inAmd, rates: amdRates })), Math.round(savingsBalance(withSavings) * 400));
+
+// A started save-up project (one ֏10,000,000 part in April 2028, no bill): split into monthly payments from
+// this month, with a recurring bill; the payments add up to the price exactly.
+const saveUp = {
+  ...budget,
+  projects: [{ id: "car2", name: "Car", startedDate: "2026-11-19" }],
+  parts: [
+    {
+      projectId: "car2",
+      project: "Car",
+      partId: "p1",
+      part: "Car",
+      cost: 10_000_000,
+      payMonth: "2028-04",
+      status: "Planned" as const,
+      paidDate: "",
+    },
+  ],
+};
+const splitUp = splitStartedProjects(saveUp, today);
+const payments = splitUp.parts.filter((p) => p.projectId === "car2");
+assert.equal(payments.length, 18); // Nov 2026 … Apr 2028
+assert.deepEqual([payments[0].payMonth, payments[17].payMonth], ["2026-11", "2028-04"]);
+assert.equal(payments[0].cost, 555_556);
+assert.equal(
+  payments.reduce((t, p) => t + p.cost, 0),
+  10_000_000
+);
+assert.ok(payments.every((p) => p.installment === "saving" && p.status === "Planned"));
+assert.deepEqual(
+  splitUp.bills.filter((x) => x.projectId === "car2").map((x) => [x.id, x.amount, x.startMonth, x.endMonth]),
+  [["car2-b1", 555_556, "2026-11", "2028-04"]]
+);
+assert.equal(splitStartedProjects(splitUp, today), splitUp); // has a bill now: never split again
+assert.equal(splitStartedProjects({ ...saveUp, projects: [{ id: "car2", name: "Car" }] }, today).parts.length, 1); // not started: left alone
+// Counted once: the bill is in each month's bills, the payments carry the project's money.
+const splitSummary = projectSummary(splitUp, { id: "car2", name: "Car", startedDate: "2026-11-19" }, today);
+assert.deepEqual([splitSummary.status, splitSummary.left, splitSummary.paid], ["active", 10_000_000, 0]);
+assert.deepEqual(splitSummary.next, { month: "2026-11", amount: 555_556 });
+assert.equal(repairProjects(splitUp, today), splitUp);
+
+// Started loan: the bill and its instalment parts are the same money, counted once.
+const startLoanBill = { id: "lb", ...start.bills[0] };
+const startedCar = {
+  ...started,
+  projects: [{ id: "car", name: "Car", startedDate: "2026-11-30" }],
+  bills: [...started.bills, startLoanBill],
+};
+const carSummary = projectSummary(startedCar, { id: "car", name: "Car", startedDate: "2026-11-30" }, today);
+assert.equal(Math.round(carSummary.left), Math.round(700 + 204.35 * 12)); // the parts only, not the bill again
+// Adding the bill doesn't charge the same payments twice: the plan only differs by the bigger safety cushion
+// (1 month of bills here, now including the loan payment), never by the payments themselves.
+assert.deepEqual(
+  projectPlan(startedCar, "car", today).months.map((m) => Math.round(m.balance + 204.35)),
+  projectPlan(started, "car", today).months.map((m) => Math.round(m.balance))
+);
+// Repair: a started loan whose instalments became a bill gets them back, once, with stable ids.
+const lost = { ...startedCar, parts: startedCar.parts.filter((p) => !p.installment) };
+const restored = restoreInstallments(lost).parts.filter((p) => p.installment);
+assert.equal(restored.length, 12);
+assert.deepEqual(
+  [restored[0].partId, restored[0].payMonth, restored[0].cost, restored[0].status],
+  ["lb-1", "2026-12", 204.35, "Planned"]
+);
+assert.equal(restoreInstallments(startedCar), startedCar); // instalments present: untouched
 
 console.log("engine: all checks passed");

@@ -17,6 +17,7 @@ import {
   parseSheet,
   personalUpdate,
   projectsUpdate,
+  resetRequests,
   SAVING_COLUMNS,
   savingsUpdate,
   setupUpdate,
@@ -376,5 +377,35 @@ assert.deepEqual(
   [{ id: "s", name: "Cash", amount: 2000, currency: "USD" }]
 );
 assert.equal(parseSheet({ orders: undefined, projects: undefined, bills: undefined, months: [] }).savings, null);
+
+// Start over: data tabs keep only their header, other months are deleted, this month's ledger emptied.
+const reset = resetRequests(
+  [
+    { title: "Setup", sheetId: 0 },
+    { title: "Orders", sheetId: 1 },
+    { title: "Projects", sheetId: 2 },
+    { title: "_MonthTemplate", sheetId: 3 },
+    { title: "2026-10", sheetId: 7 },
+    { title: "2026-11", sheetId: 4 },
+    { title: "Notes", sheetId: 9 }, // a person's own tab: untouched
+  ],
+  "2026-11",
+  defaultBudget()
+) as Record<string, { sheetId?: number; range?: { sheetId: number; startColumnIndex: number }; rows?: unknown[] }>[];
+const resetKinds = reset.map((r) => {
+  const [kind, body] = Object.entries(r)[0];
+  return `${kind}:${body.sheetId ?? body.range?.sheetId}`;
+});
+assert.deepEqual(resetKinds, [
+  "updateCells:1",
+  "updateCells:2",
+  "deleteSheet:7",
+  "updateCells:4",
+  "updateCells:0",
+  "updateCells:0",
+]);
+assert.equal(reset[0].updateCells.rows?.length, 1); // Orders: header only
+assert.equal(reset[3].updateCells.rows?.length, 1); // this month: ledger header only (A–H; the summary stays)
+assert.ok(!resetKinds.some((k) => k.endsWith(":3") || k.endsWith(":9"))); // template and own tabs untouched
 
 console.log("sheet template: all checks passed");

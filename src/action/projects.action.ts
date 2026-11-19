@@ -24,7 +24,11 @@ const validPart = (p: ProjectPart) =>
   MONTH.test(p.payMonth) &&
   (p.status === "Planned" || p.status === "Paid") &&
   optionalDate(p.paidDate) &&
-  (p.installment === undefined || p.installment === null || p.installment === "bank" || p.installment === "friend");
+  (p.installment === undefined ||
+    p.installment === null ||
+    p.installment === "bank" ||
+    p.installment === "friend" ||
+    p.installment === "saving");
 
 /** Mirrors the app's projects and their parts into the sheet's Projects tab. No sheet connected → nothing to do. */
 /** Returns `true` once written, `false` when no sheet is connected. */
