@@ -15,5 +15,6 @@ export * from "./ui/native-select";
 export * from "./ui/progress";
 export * from "./ui/radio-group";
 export * from "./ui/separator";
+export * from "./ui/sheet";
 export * from "./ui/table";
 export * from "./ui/toggle-group";

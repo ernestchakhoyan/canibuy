@@ -27,7 +27,7 @@ import {
   SearchCheckIcon,
   ShoppingBagIcon,
 } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 
 const verdictText: Record<Verdict, { label: string; tone: string; icon: typeof PiggyBankIcon }> = {
   pay_now: { label: "You can pay now", tone: "bg-positive/10 text-positive", icon: CheckCircle2Icon },
@@ -36,7 +36,9 @@ const verdictText: Record<Verdict, { label: string; tone: string; icon: typeof P
   not_affordable: { label: "Not affordable now", tone: "bg-negative/10 text-negative", icon: CircleSlashIcon },
 };
 
-export function OrderForm() {
+/** `onDone` runs after a successful save (the quick-add sheet closes itself with it). */
+export function OrderForm({ onDone }: { onDone?: () => void }) {
+  const id = useId(); // also rendered in the quick-add sheet, so ids must be unique
   const [error, setError] = useState("");
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -53,6 +55,7 @@ export function OrderForm() {
     });
     setError("");
     event.currentTarget.reset();
+    onDone?.();
   };
 
   return (
@@ -60,13 +63,13 @@ export function OrderForm() {
       <form onSubmit={submit}>
         <FieldGroup className="grid grid-cols-2 gap-4">
           <Field className="col-span-2">
-            <FieldLabel htmlFor="order-item">Item</FieldLabel>
-            <Input id="order-item" name="item" required placeholder="TV, sofa, laptop…" />
+            <FieldLabel htmlFor={`${id}-item`}>Item</FieldLabel>
+            <Input id={`${id}-item`} name="item" required placeholder="TV, sofa, laptop…" />
           </Field>
           <Field data-invalid={!!error || undefined}>
-            <FieldLabel htmlFor="order-price">Price</FieldLabel>
+            <FieldLabel htmlFor={`${id}-price`}>Price</FieldLabel>
             <Input
-              id="order-price"
+              id={`${id}-price`}
               name="price"
               inputMode="decimal"
               required
@@ -76,8 +79,14 @@ export function OrderForm() {
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="order-deadline">Deadline (months)</FieldLabel>
-            <Input id="order-deadline" name="deadline" inputMode="numeric" autoComplete="off" placeholder="Optional" />
+            <FieldLabel htmlFor={`${id}-deadline`}>Deadline (months)</FieldLabel>
+            <Input
+              id={`${id}-deadline`}
+              name="deadline"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="Optional"
+            />
           </Field>
           {error && <FieldError className="col-span-2">{error}</FieldError>}
           <Button type="submit" className="col-span-2">

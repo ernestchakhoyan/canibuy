@@ -49,6 +49,9 @@ Data flows one way: `src/app/<route>/page.tsx` → builder (`@builder`) → cont
   `await connection()` first (Auth.js touches `crypto` before cookies, which Cache Components rejects).
 - `AppShell` (root layout) must always render `children`: hiding the page segment on the server breaks Partial
   Prefetching's instant-navigation validation. Put loading gates inside builders instead.
+- `AppShell` gets the quick-add sheet (`QuickAdd` container) as a `quickAdd` prop from the root layout: a `"use client"`
+  file can't import the `@container` barrel, which also exports server-only auth containers. Forms shown in the sheet
+  take `onDone` (closes it) and build ids with `useId`, since the same form is also mounted on its page.
 - Cache Components keeps visited pages mounted but hidden (`<Activity>`): forms reset in their submit handler, and
   e2e selectors must be visibility-aware (`getByRole`, not `getByLabel`).
 

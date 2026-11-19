@@ -14,9 +14,11 @@ import {
   NativeSelectOption,
 } from "@widget";
 import { PlusIcon } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 
-export function ExpenseForm() {
+/** `onDone` runs after a successful save (the quick-add sheet closes itself with it). */
+export function ExpenseForm({ onDone }: { onDone?: () => void }) {
+  const id = useId(); // also rendered in the quick-add sheet, so ids must be unique
   const b = useLoadedBudget();
   const [error, setError] = useState("");
 
@@ -34,6 +36,7 @@ export function ExpenseForm() {
     });
     setError("");
     event.currentTarget.reset();
+    onDone?.();
   };
 
   return (
@@ -41,9 +44,9 @@ export function ExpenseForm() {
       <form onSubmit={submit}>
         <FieldGroup className="grid grid-cols-2 gap-4">
           <Field data-invalid={!!error || undefined}>
-            <FieldLabel htmlFor="expense-amount">Amount</FieldLabel>
+            <FieldLabel htmlFor={`${id}-amount`}>Amount</FieldLabel>
             <Input
-              id="expense-amount"
+              id={`${id}-amount`}
               name="amount"
               inputMode="decimal"
               required
@@ -53,20 +56,20 @@ export function ExpenseForm() {
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="expense-category">Category</FieldLabel>
-            <NativeSelect id="expense-category" name="category" className="w-full">
+            <FieldLabel htmlFor={`${id}-category`}>Category</FieldLabel>
+            <NativeSelect id={`${id}-category`} name="category" className="w-full">
               {b.categories.map((c) => (
                 <NativeSelectOption key={c.name}>{c.name}</NativeSelectOption>
               ))}
             </NativeSelect>
           </Field>
           <Field>
-            <FieldLabel htmlFor="expense-date">Date</FieldLabel>
-            <Input id="expense-date" name="date" type="date" defaultValue={todayISO()} />
+            <FieldLabel htmlFor={`${id}-date`}>Date</FieldLabel>
+            <Input id={`${id}-date`} name="date" type="date" defaultValue={todayISO()} />
           </Field>
           <Field>
-            <FieldLabel htmlFor="expense-note">Note</FieldLabel>
-            <Input id="expense-note" name="note" placeholder="Optional" />
+            <FieldLabel htmlFor={`${id}-note`}>Note</FieldLabel>
+            <Input id={`${id}-note`} name="note" placeholder="Optional" />
           </Field>
           {error && <FieldError className="col-span-2">{error}</FieldError>}
           <Button type="submit" className="col-span-2">

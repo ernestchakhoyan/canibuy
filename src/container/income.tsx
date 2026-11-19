@@ -23,11 +23,13 @@ import {
   RadioGroupItem,
 } from "@widget";
 import { PlusIcon } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 
 const MONTHS_AHEAD = 24;
 
-export function IncomeForm() {
+/** `onDone` runs after a successful save (the quick-add sheet closes itself with it). */
+export function IncomeForm({ onDone }: { onDone?: () => void }) {
+  const id = useId(); // also rendered in the quick-add sheet, so ids must be unique
   const [error, setError] = useState("");
   const today = todayISO();
   const current = monthOf(today);
@@ -47,6 +49,7 @@ export function IncomeForm() {
     });
     setError("");
     event.currentTarget.reset();
+    onDone?.();
   };
 
   return (
@@ -54,9 +57,9 @@ export function IncomeForm() {
       <form onSubmit={submit}>
         <FieldGroup className="grid grid-cols-2 gap-4">
           <Field data-invalid={!!error || undefined}>
-            <FieldLabel htmlFor="income-amount">Amount</FieldLabel>
+            <FieldLabel htmlFor={`${id}-amount`}>Amount</FieldLabel>
             <Input
-              id="income-amount"
+              id={`${id}-amount`}
               name="amount"
               inputMode="decimal"
               required
@@ -66,8 +69,8 @@ export function IncomeForm() {
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor="income-month">Month</FieldLabel>
-            <NativeSelect id="income-month" name="month" className="w-full">
+            <FieldLabel htmlFor={`${id}-month`}>Month</FieldLabel>
+            <NativeSelect id={`${id}-month`} name="month" className="w-full">
               {months.map((m) => (
                 <NativeSelectOption key={m} value={m}>
                   {monthLabel(m)}
@@ -78,22 +81,22 @@ export function IncomeForm() {
           <FieldSet className="col-span-2">
             <RadioGroup name="type" defaultValue="salary" aria-label="Income type" className="flex flex-wrap gap-x-6">
               <Field orientation="horizontal" className="min-h-11 w-auto">
-                <RadioGroupItem value="salary" id="income-salary" />
-                <Label htmlFor="income-salary" className="font-normal">
+                <RadioGroupItem value="salary" id={`${id}-salary`} />
+                <Label htmlFor={`${id}-salary`} className="font-normal">
                   Salary (replaces usual income)
                 </Label>
               </Field>
               <Field orientation="horizontal" className="min-h-11 w-auto">
-                <RadioGroupItem value="extra" id="income-extra" />
-                <Label htmlFor="income-extra" className="font-normal">
+                <RadioGroupItem value="extra" id={`${id}-extra`} />
+                <Label htmlFor={`${id}-extra`} className="font-normal">
                   Extra
                 </Label>
               </Field>
             </RadioGroup>
           </FieldSet>
           <Field className="col-span-2">
-            <FieldLabel htmlFor="income-note">Note</FieldLabel>
-            <Input id="income-note" name="note" placeholder="Optional" />
+            <FieldLabel htmlFor={`${id}-note`}>Note</FieldLabel>
+            <Input id={`${id}-note`} name="note" placeholder="Optional" />
           </Field>
           {error && <FieldError className="col-span-2">{error}</FieldError>}
           <Button type="submit" className="col-span-2">

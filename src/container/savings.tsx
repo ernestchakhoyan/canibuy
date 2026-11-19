@@ -17,7 +17,7 @@ import {
   Stat,
 } from "@widget";
 import { ArrowDownToLineIcon, ArrowUpFromLineIcon } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 
 export function SavingsOverview() {
   const b = useLoadedBudget();
@@ -35,7 +35,9 @@ export function SavingsOverview() {
   );
 }
 
-export function SavingsForm() {
+/** `onDone` runs after a successful save (the quick-add sheet closes itself with it). */
+export function SavingsForm({ onDone }: { onDone?: () => void }) {
+  const id = useId(); // also rendered in the quick-add sheet, so ids must be unique
   const b = useLoadedBudget();
   const [error, setError] = useState("");
   const openOrders = b.orders.filter((o) => o.status === "Planned" || o.status === "Saving");
@@ -55,6 +57,7 @@ export function SavingsForm() {
     });
     setError("");
     event.currentTarget.reset();
+    onDone?.();
   };
 
   return (
@@ -62,9 +65,9 @@ export function SavingsForm() {
       <form onSubmit={submit}>
         <FieldGroup className="grid grid-cols-2 gap-4">
           <Field data-invalid={!!error || undefined}>
-            <FieldLabel htmlFor="savings-amount">Amount</FieldLabel>
+            <FieldLabel htmlFor={`${id}-amount`}>Amount</FieldLabel>
             <Input
-              id="savings-amount"
+              id={`${id}-amount`}
               name="amount"
               inputMode="decimal"
               required
@@ -74,8 +77,8 @@ export function SavingsForm() {
             />
           </Field>
           <Field data-disabled={openOrders.length === 0 || undefined}>
-            <FieldLabel htmlFor="savings-order">For order</FieldLabel>
-            <NativeSelect id="savings-order" name="order" className="w-full" disabled={openOrders.length === 0}>
+            <FieldLabel htmlFor={`${id}-order`}>For order</FieldLabel>
+            <NativeSelect id={`${id}-order`} name="order" className="w-full" disabled={openOrders.length === 0}>
               <NativeSelectOption value="">None</NativeSelectOption>
               {openOrders.map((o) => (
                 <NativeSelectOption key={o.id} value={o.id}>
@@ -85,8 +88,8 @@ export function SavingsForm() {
             </NativeSelect>
           </Field>
           <Field className="col-span-2">
-            <FieldLabel htmlFor="savings-note">Note</FieldLabel>
-            <Input id="savings-note" name="note" placeholder="Optional" />
+            <FieldLabel htmlFor={`${id}-note`}>Note</FieldLabel>
+            <Input id={`${id}-note`} name="note" placeholder="Optional" />
           </Field>
           {error && <FieldError className="col-span-2">{error}</FieldError>}
           <Button type="submit" name="action" value="add">

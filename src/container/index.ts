@@ -6,5 +6,6 @@ export * from "./month-expenses";
 export * from "./month-overview";
 export * from "./orders";
 export * from "./projects";
+export * from "./quick-add";
 export * from "./savings";
 export * from "./setup";
