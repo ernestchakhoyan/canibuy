@@ -4,6 +4,7 @@ import { cn, formatMoney, parseAmount } from "@helper";
 import { budgetActions, useLoadedBudget } from "@store";
 import type { Settings } from "@type";
 import {
+  AmountsToggle,
   Badge,
   Button,
   Card,
@@ -14,12 +15,20 @@ import {
   FieldLabel,
   Input,
   Label,
+  maskedMoney,
   NativeSelect,
   NativeSelectOption,
 } from "@widget";
 import { CheckIcon, PlusIcon, XIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { type FormEvent, useState } from "react";
+
+/** Stored as the symbol: `formatMoney` and the sheet's `currency` row use it as is. */
+const CURRENCIES = [
+  { symbol: "֏", key: "amd" },
+  { symbol: "$", key: "usd" },
+  { symbol: "€", key: "eur" },
+] as const;
 
 const NUMBER_FIELDS = [
   "usualIncome",
@@ -29,10 +38,14 @@ const NUMBER_FIELDS = [
   "loanTermMonths",
 ] as const satisfies (keyof Settings)[];
 
+/** Amounts of money, masked until the eye button shows them. The other fields are months and a rate. */
+const MONEY_FIELDS: readonly (keyof Settings)[] = ["usualIncome", "openingSavings"];
+
 export function SettingsForm() {
   const t = useTranslations("setup");
   const b = useLoadedBudget();
   const [saved, setSaved] = useState(false);
+  const [moneyHidden, setMoneyHidden] = useState(true); // hidden on every visit, not remembered
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -40,24 +53,57 @@ export function SettingsForm() {
     const numbers = Object.fromEntries(
       NUMBER_FIELDS.map((name) => [name, Math.max(0, parseAmount(String(form.get(name))) ?? 0)])
     );
-    budgetActions.updateSettings({ ...numbers, currency: String(form.get("currency")).trim() || "$" });
+    budgetActions.updateSettings({ ...numbers, currency: String(form.get("currency")).trim() || "֏" });
     setSaved(true);
   };
 
   return (
-    <Card title={t("settings.title")}>
+    <Card
+      title={t("settings.title")}
+      action={<AmountsToggle hidden={moneyHidden} onToggle={() => setMoneyHidden(!moneyHidden)} />}
+    >
       <form onSubmit={submit} onChange={() => setSaved(false)}>
         <FieldGroup className="grid grid-cols-2 items-end gap-4">
           <Field>
             <FieldLabel htmlFor="setup-currency">{t("settings.currency")}</FieldLabel>
-            <Input id="setup-currency" name="currency" defaultValue={b.settings.currency} maxLength={3} />
+            <NativeSelect id="setup-currency" name="currency" defaultValue={b.settings.currency} className="w-full">
+              {CURRENCIES.map(({ symbol, key }) => (
+                <NativeSelectOption key={key} value={symbol}>
+                  {symbol} {t(`currencies.${key}`)}
+                </NativeSelectOption>
+              ))}
+              {/* A symbol typed in before this became a dropdown: keep it selectable so saving doesn't change it. */}
+              {!CURRENCIES.some((c) => c.symbol === b.settings.currency) && (
+                <NativeSelectOption value={b.settings.currency}>{b.settings.currency}</NativeSelectOption>
+              )}
+            </NativeSelect>
           </Field>
-          {NUMBER_FIELDS.map((name) => (
-            <Field key={name}>
-              <FieldLabel htmlFor={`setup-${name}`}>{t(`settings.${name}`)}</FieldLabel>
-              <Input id={`setup-${name}`} name={name} inputMode="decimal" defaultValue={b.settings[name]} />
-            </Field>
-          ))}
+          {NUMBER_FIELDS.map((name) => {
+            const masked = moneyHidden && MONEY_FIELDS.includes(name);
+            return (
+              <Field key={name}>
+                <FieldLabel htmlFor={`setup-${name}`}>{t(`settings.${name}`)}</FieldLabel>
+                {/* The real input stays mounted while masked: unsaved edits survive, and the form still submits it. */}
+                <Input
+                  id={masked ? undefined : `setup-${name}`}
+                  name={name}
+                  inputMode="decimal"
+                  defaultValue={b.settings[name]}
+                  hidden={masked}
+                />
+                {masked && (
+                  <Input
+                    id={`setup-${name}`}
+                    readOnly
+                    value={maskedMoney(b.settings.currency)}
+                    aria-description={t("settings.amountHidden")}
+                    className="cursor-pointer text-muted-foreground"
+                    onClick={() => setMoneyHidden(false)}
+                  />
+                )}
+              </Field>
+            );
+          })}
           <Button type="submit" className="col-span-2">
             {saved && <CheckIcon data-icon="inline-start" />}
             {saved ? t("saved") : t("save")}

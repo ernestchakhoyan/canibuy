@@ -6,7 +6,7 @@ export const defaultBudget = (): Budget => {
   const month = monthOf(todayISO());
   return {
     settings: {
-      currency: "$",
+      currency: "֏",
       usualIncome: 0,
       openingSavings: 0,
       cushionMonths: 3,

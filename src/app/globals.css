@@ -76,6 +76,20 @@
   --chart-5: oklch(0.55 0.08 170);
 }
 
+/*
+ * Set at runtime by next/font (the `variable` classes on <html> in the root layout), so no stylesheet defines them.
+ * Registering them lets the IDE resolve the var() calls below; `syntax: "*"` keeps them behaving like plain
+ * custom properties.
+ */
+@property --font-geist-sans {
+  syntax: "*";
+  inherits: true;
+}
+@property --font-geist-mono {
+  syntax: "*";
+  inherits: true;
+}
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

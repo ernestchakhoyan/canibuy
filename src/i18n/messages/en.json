@@ -24,7 +24,9 @@
     "main": "Main"
   },
   "common": {
-    "loading": "Loading your budget…"
+    "loading": "Loading your budget…",
+    "showAmounts": "Show amounts",
+    "hideAmounts": "Hide amounts"
   },
   "connect": {
     "headline": "How much can I save this month, and <em>can I afford this?</em>"
@@ -37,7 +39,8 @@
       "light": "Light",
       "dark": "Dark"
     },
-    "language": "Language"
+    "language": "Language",
+    "syncFailed": "Couldn't save to your Google Sheet. It's saved on this device."
   },
   "income": {
     "addTitle": "Add income",
@@ -233,12 +236,13 @@
     "remove": "Remove {name}",
     "settings": {
       "title": "Money basics",
-      "currency": "Currency symbol",
+      "currency": "Currency",
       "usualIncome": "Usual monthly income",
       "openingSavings": "Current savings",
       "cushionMonths": "Safety cushion (months of bills)",
       "loanRate": "Loan interest (% per year)",
-      "loanTermMonths": "Loan term (months)"
+      "loanTermMonths": "Loan term (months)",
+      "amountHidden": "Hidden. Use Show amounts to see or edit it."
     },
     "bills": {
       "title": "Recurring bills",
@@ -255,6 +259,11 @@
       "title": "Categories",
       "new": "New category",
       "add": "Add"
+    },
+    "currencies": {
+      "amd": "Armenian dram",
+      "usd": "US dollar",
+      "eur": "Euro"
     }
   },
   "auth": {

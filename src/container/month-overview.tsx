@@ -2,16 +2,31 @@
 
 import { formatMoney, monthSummary, savingsBalance, todayISO } from "@helper";
 import { useLoadedBudget } from "@store";
-import { Alert, AlertDescription, AlertTitle, Button, Card, Separator, Stat } from "@widget";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  AmountsToggle,
+  Button,
+  Card,
+  maskedMoney,
+  Separator,
+  Stat,
+} from "@widget";
 import { SparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
+import { useState } from "react";
 
 export function MonthOverview() {
   const t = useTranslations("month");
   const locale = useLocale();
   const b = useLoadedBudget();
-  const money = (n: number) => formatMoney(Math.round(n), b.settings.currency, locale);
+  const [hidden, setHidden] = useState(true); // hidden on every visit, not remembered
+  const money = (n: number) =>
+    hidden ? maskedMoney(b.settings.currency) : formatMoney(Math.round(n), b.settings.currency, locale);
+  // Red / green would give away the sign of a hidden amount.
+  const tone = (shown: "positive" | "negative" | "default") => (hidden ? "default" : shown);
   const s = monthSummary(b, todayISO());
   const needsSetup = b.settings.usualIncome === 0 && b.bills.length === 0;
 
@@ -34,14 +49,21 @@ export function MonthOverview() {
           aria-hidden="true"
           className="pointer-events-none absolute -top-16 -right-16 size-48 rounded-full bg-brand-gold/30 blur-2xl"
         />
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium opacity-80">{t("canStillSave")}</span>
-          <span className="text-5xl font-semibold tracking-tight tabular-nums">{money(s.canStillSave)}</span>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="text-sm font-medium opacity-80">{t("canStillSave")}</span>
+            <span className="text-5xl font-semibold tracking-tight tabular-nums">{money(s.canStillSave)}</span>
+          </div>
+          <AmountsToggle
+            hidden={hidden}
+            onToggle={() => setHidden(!hidden)}
+            className="-mt-1 -mr-2 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+          />
         </div>
       </Card>
       <Card>
         <div className="grid grid-cols-2 gap-4">
-          <Stat label={t("left")} value={money(s.left)} tone={s.left < 0 ? "negative" : "default"} />
+          <Stat label={t("left")} value={money(s.left)} tone={tone(s.left < 0 ? "negative" : "default")} />
           <Stat
             label={t("dailyAllowance")}
             value={money(s.dailyAllowance)}
@@ -55,7 +77,7 @@ export function MonthOverview() {
             value={money(s.projectedSpend)}
             hint={t("spentSoFar", { amount: money(s.spent) })}
           />
-          <Stat label={t("savingsBalance")} value={money(savingsBalance(b))} tone="positive" />
+          <Stat label={t("savingsBalance")} value={money(savingsBalance(b))} tone={tone("positive")} />
         </div>
       </Card>
     </>

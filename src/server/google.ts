@@ -1,6 +1,7 @@
 import "server-only";
 import { defaultBudget, monthOf, todayISO } from "@helper";
-import { buildSpreadsheet } from "./sheet-template";
+import type { Personal } from "@type";
+import { buildSpreadsheet, PERSONAL_RANGE, personalRows } from "./sheet-template";
 
 // Google REST calls over fetch. Every Sheets/Drive call goes through the server; tokens never reach the browser.
 
@@ -60,5 +61,13 @@ export const findOrCreateSpreadsheet = async (accessToken: string) => {
   });
   return created.spreadsheetId;
 };
+
+/** Overwrites the Setup tab's Personal block. Writes the header row too, so sheets made before it existed get it. */
+export const writePersonal = (accessToken: string, spreadsheetId: string, personal: Personal) =>
+  google(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(PERSONAL_RANGE)}?valueInputOption=RAW`,
+    accessToken,
+    { method: "PUT", body: JSON.stringify({ values: personalRows(personal) }) }
+  );
 
 export const spreadsheetUrl = (id: string) => `https://docs.google.com/spreadsheets/d/${id}/edit`;

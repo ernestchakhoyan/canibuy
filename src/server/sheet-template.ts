@@ -1,4 +1,4 @@
-import type { Budget } from "@type";
+import type { Budget, Personal } from "@type";
 
 // Builds the Sheets API `spreadsheets.create` body for the template in PRD section 6, in a single request:
 // tabs, headers, frozen + warning-protected row 1, named ranges, a hidden month template and the current month.
@@ -6,6 +6,14 @@ import type { Budget } from "@type";
 
 export const TEMPLATE_VERSION = 1;
 export const SPREADSHEET_TITLE = "canibuy";
+
+/** The "Personal" key/value block on the Setup tab (N–O); `buildSpreadsheet` places it, `writePersonal` updates it. */
+export const PERSONAL_RANGE = "Setup!N1:O3";
+export const personalRows = (p: Personal) => [
+  ["key", "value"],
+  ["app_mode", p.appMode],
+  ["locale", p.locale],
+];
 
 const SHEET_ID = { setup: 0, orders: 1, projects: 2, monthTemplate: 3, currentMonth: 4 } as const;
 
@@ -80,11 +88,6 @@ export const buildSpreadsheet = (budget: Budget, month: string) => {
     ["start_month", s.startMonth],
     ["template_version", TEMPLATE_VERSION],
   ];
-  const personalRows: Value[][] = [
-    ["key", "value"],
-    ["app_mode", budget.personal.appMode],
-    ["locale", budget.personal.locale],
-  ];
   const billRows: Value[][] = [
     ["id", "name", "amount", "due_day", "category", "active"],
     ...budget.bills.map((b) => [b.id, b.name, b.amount, b.dueDay, b.category, b.active]),
@@ -111,7 +114,7 @@ export const buildSpreadsheet = (budget: Budget, month: string) => {
         { column: 0, rows: settingsRows }, // A–B
         { column: 3, rows: billRows }, // D–I
         { column: 10, rows: categoryRows }, // K–L
-        { column: 13, rows: personalRows }, // N–O
+        { column: 13, rows: personalRows(budget.personal) }, // N–O = PERSONAL_RANGE
       ]),
       sheet(SHEET_ID.orders, "Orders", [
         {

@@ -95,3 +95,15 @@ export const googleToken = async () => {
     secureCookie: h.get("cookie")?.includes("__Secure-authjs.session-token") ?? false,
   });
 };
+
+/**
+ * A usable access token for a server action. `googleToken()` reads the cookie as sent, which can hold an expired
+ * token (the `jwt` callback only refreshes inside `auth()`); refresh here with the same 60 s margin. Not persisted:
+ * the next `auth()` refreshes the cookie itself.
+ */
+export const googleAccessToken = async () => {
+  const token = await googleToken();
+  if (!token?.refreshToken || token.error) return null;
+  if (token.accessToken && token.expiresAt && Date.now() < (token.expiresAt - 60) * 1000) return token.accessToken;
+  return (await refreshAccessToken(token.refreshToken)).accessToken;
+};

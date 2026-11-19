@@ -1,7 +1,7 @@
 // Self-check for the Google Sheet template. Run: bun run test
 import assert from "node:assert/strict";
 import { defaultBudget } from "@helper";
-import { buildSpreadsheet, TEMPLATE_VERSION } from "./sheet-template";
+import { buildSpreadsheet, PERSONAL_RANGE, TEMPLATE_VERSION } from "./sheet-template";
 
 const body = buildSpreadsheet(defaultBudget(), "2026-11");
 const titles = body.sheets.map((s) => s.properties.title);
@@ -36,6 +36,9 @@ assert.equal(range("Personal").startColumnIndex, 13);
 assert.equal(valueAt(0, 1, 13), "app_mode");
 assert.equal(valueAt(0, 1, 14), "system");
 assert.equal(valueAt(0, 2, 13), "locale");
+// writePersonal updates the same cells the template creates: N = column 13, rows 1–3.
+assert.equal(PERSONAL_RANGE, "Setup!N1:O3");
+assert.equal(String.fromCharCode(65 + range("Personal").startColumnIndex), "N");
 
 // Month tab: ledger header in A–H, summary in J–K with "Left" on row 7 referencing K2–K6.
 assert.equal(valueAt(4, 0, 0), "id");

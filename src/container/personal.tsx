@@ -1,11 +1,13 @@
 "use client";
 
+import { savePersonal } from "@action";
 import { LOCALE_NAMES, routing } from "@i18n";
 import { budgetActions, useLoadedBudget } from "@store";
-import type { AppMode, Locale } from "@type";
+import type { AppMode, Locale, Personal } from "@type";
 import {
   Card,
   Field,
+  FieldError,
   FieldLabel,
   Select,
   SelectContent,
@@ -18,6 +20,7 @@ import {
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
+import { useState } from "react";
 
 /** Flag + native name; the flag is decorative, the name says which language it is. */
 const LocaleLabel = ({ locale }: { locale: Locale }) => (
@@ -33,14 +36,23 @@ const MODES = [
   { value: "dark", icon: MoonIcon },
 ] as const;
 
-/** Appearance and language. Both apply at once; they're saved with the budget ("Personal" block of the sheet). */
+/** Appearance and language. Both apply at once, on this device and in the "Personal" block of the sheet. */
 export function PersonalForm() {
   const t = useTranslations("personal");
   const b = useLoadedBudget();
   const locale = useLocale(); // what's on screen, from the cookie; may differ from the budget on a new device
+  const [syncFailed, setSyncFailed] = useState(false);
 
-  const changeLocale = (next: Locale) => {
-    budgetActions.updatePersonal({ locale: next });
+  /** Local first (instant), then the sheet. A failed sheet write keeps the local value and says so. */
+  const save = (change: Partial<Personal>) => {
+    budgetActions.updatePersonal(change);
+    setSyncFailed(false);
+    // ponytail: each call writes the whole block; rapid toggles can land out of order (last response wins).
+    return savePersonal({ ...b.personal, ...change }).catch(() => setSyncFailed(true));
+  };
+
+  const changeLocale = async (next: Locale) => {
+    await save({ locale: next }); // before the reload, which would cancel the request
     // The proxy reads this cookie on the next request and serves that locale's pages.
     // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API is missing on older iOS Safari
     document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
@@ -57,7 +69,7 @@ export function PersonalForm() {
             variant="outline"
             className="grid w-full grid-cols-3"
             value={[b.personal.appMode]}
-            onValueChange={(v) => v[0] && budgetActions.updatePersonal({ appMode: v[0] as AppMode })}
+            onValueChange={(v) => v[0] && save({ appMode: v[0] as AppMode })}
           >
             {MODES.map(({ value, icon: Icon }) => (
               <ToggleGroupItem key={value} value={value}>
@@ -82,6 +94,7 @@ export function PersonalForm() {
             </SelectContent>
           </Select>
         </Field>
+        {syncFailed && <FieldError>{t("syncFailed")}</FieldError>}
       </div>
     </Card>
   );
