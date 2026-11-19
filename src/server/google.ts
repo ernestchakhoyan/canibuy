@@ -1,6 +1,6 @@
 import "server-only";
 import { defaultBudget, monthOf, todayISO } from "@helper";
-import type { Bill, Category, Entry, Order, Personal, Project, ProjectPart, Settings } from "@type";
+import type { Bill, Category, Entry, Order, Personal, Project, ProjectPart, Saving, Settings } from "@type";
 import {
   billNamedRanges,
   billsUpdate,
@@ -11,6 +11,7 @@ import {
   personalUpdate,
   projectsUpdate,
   SHEET_ID,
+  savingsUpdate,
   setupUpdate,
 } from "./sheet-template";
 
@@ -169,6 +170,22 @@ export const writeSetup = async (
   await batchUpdate(accessToken, spreadsheetId, setupUpdate(setup, settings, categories));
 };
 
+/** Makes the Savings tab exactly `savings`, creating the tab on sheets made before it existed. */
+export const writeSavings = async (accessToken: string, spreadsheetId: string, savings: Saving[]) => {
+  const meta = await sheetMeta(accessToken, spreadsheetId);
+  let sheetId = meta.idOf("Savings");
+  const requests: object[] = [];
+  if (sheetId === undefined) {
+    sheetId = freeSheetId(
+      meta.tabs.map((t) => t.sheetId),
+      SHEET_ID.savings
+    );
+    requests.push({ addSheet: { properties: { sheetId, title: "Savings", gridProperties: { frozenRowCount: 1 } } } });
+  }
+  requests.push(...savingsUpdate(sheetId, savings));
+  await batchUpdate(accessToken, spreadsheetId, requests);
+};
+
 /** Makes every month tab's ledger exactly the entries dated in that month (new months copied from the template). */
 export const writeEntries = async (accessToken: string, spreadsheetId: string, entries: Entry[]) => {
   const meta = await sheetMeta(accessToken, spreadsheetId);
@@ -199,6 +216,7 @@ export const readSheet = async (accessToken: string, spreadsheetId: string) => {
     meta.idOf("Setup") === undefined ? null : "Setup!A:B",
     meta.idOf("Setup") === undefined ? null : "Setup!K:L",
     meta.idOf("Setup") === undefined ? null : "Setup!N:O",
+    meta.idOf("Savings") === undefined ? null : "Savings!A:Z",
   ];
   const wanted = ranges.filter((r): r is string => r !== null);
   const params = new URLSearchParams({
@@ -219,6 +237,7 @@ export const readSheet = async (accessToken: string, spreadsheetId: string) => {
     settings: byRange.get("Setup!A:B"),
     categories: byRange.get("Setup!K:L"),
     personal: byRange.get("Setup!N:O"),
+    savings: byRange.get("Savings!A:Z"),
   });
 };
 

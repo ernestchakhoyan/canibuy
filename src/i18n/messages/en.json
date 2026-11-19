@@ -73,7 +73,35 @@
     "add": "Add to savings",
     "take": "Take out",
     "errorAmount": "Enter an amount above 0",
-    "errorBalance": "You can't take more than your balance"
+    "errorBalance": "You can't take more than your balance",
+    "accounts": {
+      "title": "Savings accounts",
+      "empty": "Cash, deposits or cards in any currency. They count in your savings at today's rate.",
+      "add": "Add saving",
+      "addTitle": "Add saving",
+      "editTitle": "Edit saving",
+      "sheetHint": "Kept in its own currency; converted to your main currency at today's rate.",
+      "name": "Name",
+      "namePlaceholder": "Cash, bank deposit…",
+      "amount": "Amount",
+      "currency": "Currency",
+      "save": "Save",
+      "errorAmount": "Enter an amount of 0 or more",
+      "remove": "Remove {name}",
+      "approx": "≈ {amount}",
+      "noRate": "No rate yet",
+      "total": "Total",
+      "ratesFrom": "Exchange rates for {date}",
+      "unconverted": "Not counted until rates load: {currencies}",
+      "customBase": "Pick ֏, $ or € as the currency in Setup to convert these.",
+      "currencies": {
+        "AMD": "Armenian dram",
+        "USD": "US dollar",
+        "EUR": "Euro",
+        "RUB": "Russian ruble",
+        "GBP": "British pound"
+      }
+    }
   },
   "history": {
     "period": "Period",
@@ -410,7 +438,10 @@
       "cushionMonths": "Safety cushion (months of bills)",
       "loanRate": "Loan interest (% per year)",
       "loanTermMonths": "Loan term (months)",
-      "amountHidden": "Hidden. Use Show amounts to see or edit it."
+      "amountHidden": "Hidden. Use Show amounts to see or edit it.",
+      "convertHint": "Saving converts all your amounts (income, bills, entries, orders, projects) to the new currency at today's rate.",
+      "converting": "Converting…",
+      "convertError": "Couldn't load today's exchange rate, so the currency wasn't changed. Try again when you're online."
     },
     "bills": {
       "title": "Recurring bills",

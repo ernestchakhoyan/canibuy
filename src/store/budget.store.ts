@@ -1,5 +1,18 @@
-import { loadSheet, saveBills, saveEntries, saveOrders, savePersonal, saveProjects, saveSetup } from "@action";
 import {
+  loadRates,
+  loadSheet,
+  saveBills,
+  saveEntries,
+  saveOrders,
+  savePersonal,
+  saveProjects,
+  saveSavings,
+  saveSetup,
+} from "@action";
+import {
+  baseCurrency,
+  convertBudget,
+  currencyOfSymbol,
   defaultBudget,
   fromSavings,
   INITIAL_SYNC_META,
@@ -18,7 +31,7 @@ import {
   tabsToWrite,
   todayISO,
 } from "@helper";
-import type { Bill, Budget, Entry, Order, OrderStatus, Personal, Project, ProjectPart, Settings } from "@type";
+import type { Bill, Budget, Entry, Order, OrderStatus, Personal, Project, ProjectPart, Saving, Settings } from "@type";
 import { useSyncExternalStore } from "react";
 
 // ponytail: browser-only store (localStorage). Entries move to the Google Sheet in M2;
@@ -67,6 +80,7 @@ const changed: Record<SheetTab, (a: Budget, z: Budget) => boolean> = {
   entries: (a, z) => a.entries !== z.entries,
   setup: (a, z) => a.settings !== z.settings || a.categories !== z.categories,
   personal: (a, z) => a.personal !== z.personal,
+  savings: (a, z) => a.savings !== z.savings,
 };
 /** Resolves `true` once written, `false` when no sheet is connected (then it stays dirty). */
 const send: Record<SheetTab, () => Promise<boolean>> = {
@@ -79,6 +93,7 @@ const send: Record<SheetTab, () => Promise<boolean>> = {
   entries: () => saveEntries(getBudget().entries),
   setup: () => saveSetup(getBudget().settings, getBudget().categories),
   personal: () => savePersonal(getBudget().personal),
+  savings: () => saveSavings(getBudget().savings ?? []),
 };
 
 const SYNC_KEY = `${STORAGE_KEY}:sync`;
@@ -124,14 +139,31 @@ const syncTab = (tab: SheetTab) => {
   return sync.queue;
 };
 
+/**
+ * Exchange rates for converting savings kept in other currencies: fetched (server-cached) at most once a day per
+ * base currency, and only when some saving needs it. Device-only: never synced.
+ */
+const refreshRates = async () => {
+  const b = getBudget();
+  const base = baseCurrency(b);
+  if (!base || !(b.savings ?? []).some((s) => s.currency !== base)) return;
+  if (b.rates?.base === base && b.rates.date >= todayISO()) return;
+  const rates = await loadRates(base).catch(() => null);
+  if (!rates) return; // offline / source down: keep the last rates
+  state = { ...getBudget(), rates };
+  persist();
+};
+
 /** Once per session: write what the sheet is missing, then read the sheet back into every clean tab. */
 const startSession = async () => {
+  refreshRates();
   await Promise.all(tabsToWrite(getBudget(), readMeta()).map(syncTab));
   const data = await loadSheet().catch(() => null);
   if (!data) return; // not connected, or Google failed: keep what this device has
   // Re-read `dirty`: anything changed while the sheet was being read stays as it is here.
   state = mergeFromSheet(getBudget(), data, readMeta().dirty);
   persist();
+  refreshRates(); // the sheet may have brought savings in other currencies
   writeMeta((m) => ({ ...m, uploaded: SHEET_TABS })); // from now on the sheet leads for every tab
   // The language from the sheet differs from the one on screen: switch (the server renders pages per locale).
   if (state.personal.locale !== document.documentElement.lang) {
@@ -145,6 +177,7 @@ const update = (change: (b: Budget) => Budget) => {
   state = change(before);
   persist();
   for (const tab of TABS) if (changed[tab](before, state)) syncTab(tab);
+  if (state.savings !== before.savings || state.settings.currency !== before.settings.currency) refreshRates();
 };
 
 const subscribe = (listener: () => void) => {
@@ -191,6 +224,31 @@ const upsertProject = (b: Budget, projectId: string, change: Partial<Project>): 
 });
 
 export const budgetActions = {
+  /**
+   * Switches the base currency to `symbol`, converting every base amount at today's rate (see `convertBudget`).
+   * Resolves `false`, changing nothing, when there's no rate between the two (offline / source down). A custom
+   * symbol on either side can't be converted: then only the symbol changes.
+   */
+  changeCurrency: async (symbol: string) => {
+    const from = baseCurrency(getBudget());
+    const to = currencyOfSymbol(symbol);
+    if (!from || !to || from === to) {
+      update((b) => ({ ...b, settings: { ...b.settings, currency: symbol } }));
+      return true;
+    }
+    const rates = await loadRates(from).catch(() => null);
+    const stored = getBudget().rates;
+    const factor = rates?.perBase[to] ?? (stored?.base === from ? stored.perBase[to] : undefined);
+    if (!factor) return false;
+    update((b) => convertBudget(b, factor, symbol));
+    return true;
+  },
+  addSaving: (saving: Omit<Saving, "id">) =>
+    update((b) => ({ ...b, savings: [...(b.savings ?? []), { ...saving, id: newId() }] })),
+  updateSaving: (id: string, change: Partial<Omit<Saving, "id">>) =>
+    update((b) => ({ ...b, savings: (b.savings ?? []).map((s) => (s.id === id ? { ...s, ...change } : s)) })),
+  removeSaving: (id: string) => update((b) => ({ ...b, savings: (b.savings ?? []).filter((s) => s.id !== id) })),
+
   updateSettings: (settings: Partial<Settings>) => update((b) => ({ ...b, settings: { ...b.settings, ...settings } })),
   updatePersonal: (personal: Partial<Personal>) => update((b) => ({ ...b, personal: { ...b.personal, ...personal } })),
 

@@ -1,7 +1,10 @@
-import type { Bill, Budget, Entry, EntryType, Order, Project, ProjectPart } from "@type";
+import type { Bill, Budget, CurrencyCode, Entry, EntryType, Order, Project, ProjectPart } from "@type";
 import { addMonths, daysInMonth, monthOf } from "./date";
 
 // Calculation rules from PRD section 7. Everything is derived from raw rows; nothing calculated is stored.
+
+/** Rounds money to cents. */
+const cents = (n: number) => Math.round(n * 100) / 100;
 
 const sum = (entries: Entry[]) => entries.reduce((total, e) => total + e.amount, 0);
 const ofType = (entries: Entry[], type: EntryType) => entries.filter((e) => e.type === type);
@@ -32,8 +35,70 @@ export const monthIncome = (b: Budget, month: string) => {
   return (salary.length ? sum(salary) : b.settings.usualIncome) + sum(ofType(entries, "income_extra"));
 };
 
+export const CURRENCIES: CurrencyCode[] = ["AMD", "USD", "EUR", "RUB", "GBP"];
+const SYMBOLS: Record<string, CurrencyCode> = { "֏": "AMD", $: "USD", "€": "EUR", "₽": "RUB", "£": "GBP" };
+
+/** The base currency behind Setup's currency symbol; `null` for a symbol we can't convert to (a custom one). */
+export const baseCurrency = (b: Budget): CurrencyCode | null =>
+  SYMBOLS[b.settings.currency] ??
+  (CURRENCIES.includes(b.settings.currency as CurrencyCode) ? (b.settings.currency as CurrencyCode) : null);
+
+/**
+ * `amount` of `currency` in the base currency, at the stored rates; `null` when there's no usable rate (no rates
+ * yet, rates for another base, or a custom base symbol). Same currency as the base needs no rate.
+ */
+export const toBase = (b: Budget, amount: number, currency: CurrencyCode) => {
+  const base = baseCurrency(b);
+  if (base === currency) return amount;
+  const rate = b.rates?.base === base ? b.rates.perBase[currency] : undefined;
+  return rate && rate > 0 ? amount / rate : null;
+};
+
+/** The currency a Setup symbol stands for (֏ → AMD…); `null` for a custom symbol. */
+export const currencyOfSymbol = (symbol: string): CurrencyCode | null =>
+  SYMBOLS[symbol] ?? (CURRENCIES.includes(symbol as CurrencyCode) ? (symbol as CurrencyCode) : null);
+
+/**
+ * The budget with its base currency switched to `symbol`: every amount kept in the base currency (income, opening
+ * savings, bills, category limits, entries, order prices, project parts) multiplied by `factor` (1 old = `factor`
+ * new). Savings kept per currency stay as they are: they're in their own currency.
+ */
+export const convertBudget = (b: Budget, factor: number, symbol: string): Budget => {
+  // Drams aren't used with fractions: whole drams; other currencies keep cents.
+  const round = currencyOfSymbol(symbol) === "AMD" ? Math.round : cents;
+  const convert = (n: number) => round(n * factor);
+  return {
+    ...b,
+    settings: {
+      ...b.settings,
+      currency: symbol,
+      usualIncome: convert(b.settings.usualIncome),
+      openingSavings: convert(b.settings.openingSavings),
+    },
+    bills: b.bills.map((bill) => ({ ...bill, amount: convert(bill.amount) })),
+    categories: b.categories.map((c) => ({ ...c, monthlyLimit: convert(c.monthlyLimit) })),
+    entries: b.entries.map((e) => ({ ...e, amount: convert(e.amount) })),
+    orders: b.orders.map((o) => ({ ...o, price: convert(o.price) })),
+    parts: b.parts.map((p) => ({ ...p, cost: convert(p.cost) })),
+  };
+};
+
+/** Savings kept per currency, converted to the base currency; ones that can't be converted are listed apart. */
+export const savingsAccounts = (b: Budget) => {
+  const rows = (b.savings ?? []).map((s) => ({ ...s, inBase: toBase(b, s.amount, s.currency) }));
+  return {
+    rows,
+    total: rows.reduce((t, s) => t + (s.inBase ?? 0), 0),
+    unconverted: [...new Set(rows.filter((s) => s.inBase === null).map((s) => s.currency))],
+  };
+};
+
+/** Setup's "current savings" + money moved in / out of savings + savings kept per currency (converted). */
 export const savingsBalance = (b: Budget) =>
-  b.settings.openingSavings + sum(ofType(b.entries, "saving")) - sum(ofType(b.entries, "withdrawal"));
+  b.settings.openingSavings +
+  sum(ofType(b.entries, "saving")) -
+  sum(ofType(b.entries, "withdrawal")) +
+  savingsAccounts(b).total;
 
 export const cushion = (b: Budget) => b.settings.cushionMonths * monthBills(b);
 
@@ -268,8 +333,6 @@ type PartNames = {
   loan: (i: number, n: number) => string;
   friend: (i: number, n: number) => string;
 };
-
-const cents = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * The project parts for paying `price` the chosen way. Loans become one part per monthly payment (interest

@@ -82,6 +82,15 @@ export type ProjectPart = {
   startedDate?: string;
 };
 
+/** Currencies savings can be kept in (and the base currency, from Setup's currency symbol). */
+export type CurrencyCode = "AMD" | "USD" | "EUR" | "RUB" | "GBP";
+
+/** A saving kept in its own currency (cash, a deposit…); counted in the savings balance at today's rate. */
+export type Saving = { id: string; name: string; amount: number; currency: CurrencyCode };
+
+/** Exchange-rate snapshot: 1 `base` = `perBase[code]` of each currency. Stored so calculations work offline. */
+export type Rates = { base: CurrencyCode; date: string; perBase: Partial<Record<CurrencyCode, number>> };
+
 /** A project's own record; its money lives in `parts` (and, once started, in bills). */
 export type Project = {
   id: string;
@@ -102,4 +111,8 @@ export type Budget = {
   parts: ProjectPart[];
   /** Missing in budgets saved before projects had records; `projectsOf` fills the gaps. */
   projects?: Project[];
+  /** Savings kept per currency (missing in older budgets). */
+  savings?: Saving[];
+  /** Latest exchange rates for converting `savings` (device only, not synced). */
+  rates?: Rates;
 };

@@ -17,16 +17,19 @@ import {
   parseSheet,
   personalUpdate,
   projectsUpdate,
+  SAVING_COLUMNS,
+  savingsUpdate,
   setupUpdate,
   TEMPLATE_VERSION,
 } from "./sheet-template";
 
 const body = buildSpreadsheet(defaultBudget(), "2026-11");
 const titles = body.sheets.map((s) => s.properties.title);
-assert.deepEqual(titles, ["Setup", "Orders", "Projects", "Bills", "_MonthTemplate", "2026-11"]);
+assert.deepEqual(titles, ["Setup", "Orders", "Projects", "Bills", "Savings", "_MonthTemplate", "2026-11"]);
 const BILLS = 3;
-const TEMPLATE = 4;
-const MONTH = 5;
+const SAVINGS = 4;
+const TEMPLATE = 5;
+const MONTH = 6;
 assert.equal(body.sheets[TEMPLATE].properties.hidden, true);
 for (const s of body.sheets) {
   assert.equal(s.properties.gridProperties.frozenRowCount, 1, `${s.properties.title} freezes row 1`);
@@ -346,5 +349,32 @@ assert.deepEqual(
   { amountsHidden: true }
 );
 assert.deepEqual(personal([["app_mode", "light"]]), { appMode: "light" }); // older sheet: no amounts_hidden row
+
+// Savings sync: own tab, names never formulas; reading back skips unknown currencies, no tab = keep the app's.
+assert.equal(valueAt(SAVINGS, 0, SAVING_COLUMNS.length - 1), "currency");
+const savingsRows = savingsUpdate(6, [{ id: "s", name: "=Cash", amount: 2000, currency: "USD" }])[0].updateCells.rows;
+assert.deepEqual(savingsRows[1].values, [
+  { userEnteredValue: { stringValue: "s" } },
+  { userEnteredValue: { stringValue: "=Cash" } },
+  { userEnteredValue: { numberValue: 2000 } },
+  { userEnteredValue: { stringValue: "USD" } },
+]);
+const savingsBack = (rows: (string | number)[][]) =>
+  parseSheet({
+    orders: undefined,
+    projects: undefined,
+    bills: undefined,
+    months: [],
+    savings: [SAVING_COLUMNS, ...rows],
+  }).savings;
+assert.deepEqual(
+  savingsBack([
+    ["s", "Cash", 2000, "usd"],
+    ["x", "Gold", 5, "XAU"],
+    ["y", "Typo", "lots", "EUR"],
+  ]),
+  [{ id: "s", name: "Cash", amount: 2000, currency: "USD" }]
+);
+assert.equal(parseSheet({ orders: undefined, projects: undefined, bills: undefined, months: [] }).savings, null);
 
 console.log("sheet template: all checks passed");

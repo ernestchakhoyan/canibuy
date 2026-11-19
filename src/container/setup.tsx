@@ -45,15 +45,30 @@ export function SettingsForm() {
   const t = useTranslations("setup");
   const b = useLoadedBudget();
   const [saved, setSaved] = useState(false);
+  const [currency, setCurrency] = useState(b.settings.currency);
+  const [converting, setConverting] = useState(false);
+  const [convertFailed, setConvertFailed] = useState(false);
   const moneyHidden = b.personal.amountsHidden ?? true; // the eye: a Personal setting, synced with the sheet
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const numbers = Object.fromEntries(
       NUMBER_FIELDS.map((name) => [name, Math.max(0, parseAmount(String(form.get(name))) ?? 0)])
     );
-    budgetActions.updateSettings({ ...numbers, currency: String(form.get("currency")).trim() || "֏" });
+    // The typed amounts are in the current currency: save them first, then convert everything if it changed.
+    budgetActions.updateSettings(numbers);
+    const next = String(form.get("currency")).trim() || "֏";
+    setConvertFailed(false);
+    if (next !== b.settings.currency) {
+      setConverting(true);
+      const ok = await budgetActions.changeCurrency(next);
+      setConverting(false);
+      if (!ok) {
+        setCurrency(b.settings.currency); // the form re-mounted on the old currency: drop the "will convert" note
+        return setConvertFailed(true);
+      }
+    }
     setSaved(true);
   };
 
@@ -72,7 +87,13 @@ export function SettingsForm() {
         <FieldGroup className="grid grid-cols-2 items-end gap-4">
           <Field>
             <FieldLabel htmlFor="setup-currency">{t("settings.currency")}</FieldLabel>
-            <NativeSelect id="setup-currency" name="currency" defaultValue={b.settings.currency} className="w-full">
+            <NativeSelect
+              id="setup-currency"
+              name="currency"
+              defaultValue={b.settings.currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="w-full"
+            >
               {CURRENCIES.map(({ symbol, key }) => (
                 <NativeSelectOption key={key} value={symbol}>
                   {symbol} {t(`currencies.${key}`)}
@@ -84,6 +105,9 @@ export function SettingsForm() {
               )}
             </NativeSelect>
           </Field>
+          {currency !== b.settings.currency && (
+            <p className="col-span-2 text-xs text-muted-foreground">{t("settings.convertHint")}</p>
+          )}
           {NUMBER_FIELDS.map((name) => {
             const masked = moneyHidden && MONEY_FIELDS.includes(name);
             return (
@@ -110,9 +134,10 @@ export function SettingsForm() {
               </Field>
             );
           })}
-          <Button type="submit" className="col-span-2">
+          {convertFailed && <FieldError className="col-span-2">{t("settings.convertError")}</FieldError>}
+          <Button type="submit" className="col-span-2" disabled={converting}>
             {saved && <CheckIcon data-icon="inline-start" />}
-            {saved ? t("saved") : t("save")}
+            {converting ? t("settings.converting") : saved ? t("saved") : t("save")}
           </Button>
         </FieldGroup>
       </form>

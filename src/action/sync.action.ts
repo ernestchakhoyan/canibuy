@@ -1,7 +1,7 @@
 "use server";
 
-import { auth, googleAccessToken, readSheet, writeBills, writeEntries, writeSetup } from "@server";
-import type { Bill, Category, Entry, EntryType, Settings } from "@type";
+import { auth, googleAccessToken, readSheet, writeBills, writeEntries, writeSavings, writeSetup } from "@server";
+import type { Bill, Category, CurrencyCode, Entry, EntryType, Saving, Settings } from "@type";
 
 const MAX_ROWS = 20_000;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -126,6 +126,24 @@ export async function saveSetup(settings: Settings, categories: Category[]) {
     sheet.spreadsheetId,
     { currency, usualIncome, openingSavings, cushionMonths, loanRate, loanTermMonths, startMonth },
     categories.map(({ name, monthlyLimit }) => ({ name, monthlyLimit }))
+  );
+  return true;
+}
+
+const CURRENCIES: CurrencyCode[] = ["AMD", "USD", "EUR", "RUB", "GBP"];
+const validSaving = (s: Saving) =>
+  text(s.id, 32) && text(s.name, 200) && amount(s.amount) && CURRENCIES.includes(s.currency);
+
+/** Mirrors the savings (per currency) into the Savings tab. Returns `true` once written, `false` when no sheet. */
+export async function saveSavings(savings: Saving[]) {
+  if (!Array.isArray(savings) || savings.length > 500 || !savings.every(validSaving))
+    throw new Error("Invalid savings");
+  const sheet = await connectedSheet();
+  if (!sheet) return false; // nothing written: the caller must not count it as synced
+  await writeSavings(
+    sheet.accessToken,
+    sheet.spreadsheetId,
+    savings.map(({ id, name, amount, currency }) => ({ id, name, amount, currency }))
   );
   return true;
 }

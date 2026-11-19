@@ -5,6 +5,8 @@ import { periodRange } from "./date";
 import { defaultBudget } from "./default-budget";
 import {
   affordOptions,
+  baseCurrency,
+  convertBudget,
   loanPayment,
   monthBills,
   monthSummary,
@@ -17,7 +19,9 @@ import {
   projectStarted,
   projectSummary,
   projectsOf,
+  savingsAccounts,
   savingsBalance,
+  toBase,
   usableSavings,
 } from "./engine";
 import { parseAmount } from "./money";
@@ -340,6 +344,7 @@ const fromSheet = {
   settings: { usualIncome: 4000 },
   categories: [{ name: "Rent", monthlyLimit: 0 }],
   personal: { appMode: "dark" as const, amountsHidden: false },
+  savings: [{ id: "s", name: "Cash", amount: 5, currency: "USD" as const }],
 };
 const merged = mergeFromSheet(local, fromSheet, ["orders"]);
 assert.equal(merged.orders.length, 1); // dirty: kept
@@ -347,11 +352,56 @@ assert.equal(merged.entries.length, 0); // clean: the sheet wins (rows deleted t
 assert.deepEqual(merged.settings, { ...local.settings, usualIncome: 4000 }); // merged key by key
 assert.deepEqual(merged.categories, [{ name: "Rent", monthlyLimit: 0 }]);
 assert.deepEqual(
-  mergeFromSheet(local, { ...fromSheet, settings: null, categories: null, personal: null }, []).categories,
+  mergeFromSheet(local, { ...fromSheet, settings: null, categories: null, personal: null, savings: null }, [])
+    .categories,
   local.categories
 ); // no block: keep
 assert.equal(mergeFromSheet(local, fromSheet, ["setup"]).settings, local.settings); // dirty: kept
 assert.deepEqual(merged.personal, { ...local.personal, appMode: "dark", amountsHidden: false }); // key by key: locale kept
 assert.equal(mergeFromSheet(local, fromSheet, ["personal"]).personal, local.personal); // dirty: kept
+assert.deepEqual(merged.savings, fromSheet.savings);
+assert.equal(mergeFromSheet(local, { ...fromSheet, savings: null }, []).savings, local.savings); // no tab: keep
+
+// Savings per currency: converted to the base currency (Setup's "$" here) and added to the savings balance.
+const rates = { base: "USD" as const, date: "2026-11-19", perBase: { AMD: 400, EUR: 0.8 } };
+const withSavings = {
+  ...budget,
+  rates,
+  savings: [
+    { id: "s1", name: "Cash", amount: 100, currency: "USD" as const },
+    { id: "s2", name: "Deposit", amount: 40000, currency: "AMD" as const },
+    { id: "s3", name: "Euro", amount: 80, currency: "EUR" as const },
+    { id: "s4", name: "Pounds", amount: 10, currency: "GBP" as const }, // no rate for GBP
+  ],
+};
+assert.equal(baseCurrency(withSavings), "USD");
+assert.equal(toBase(withSavings, 40000, "AMD"), 100);
+assert.equal(toBase(withSavings, 100, "USD"), 100); // same currency: no rate needed
+const accounts = savingsAccounts(withSavings);
+assert.equal(accounts.total, 300); // 100 + 100 + 100; GBP left out
+assert.deepEqual(accounts.unconverted, ["GBP"]);
+assert.equal(savingsBalance(withSavings), savingsBalance(budget) + 300);
+assert.equal(usableSavings(withSavings), usableSavings(budget) + 300); // every calculation sees the converted total
+assert.equal(toBase({ ...withSavings, rates: { ...rates, base: "EUR" } }, 40000, "AMD"), null); // stale base: no guess
+assert.equal(baseCurrency({ ...budget, settings: { ...budget.settings, currency: "¤" } }), null); // custom symbol
+
+// Switching the base currency converts every base amount; savings per currency and non-money numbers don't change.
+const inAmd = convertBudget(withSavings, 400, "֏"); // 1 USD = 400 AMD
+assert.equal(inAmd.settings.currency, "֏");
+assert.equal(inAmd.settings.usualIncome, 1500 * 400);
+assert.equal(inAmd.settings.cushionMonths, withSavings.settings.cushionMonths);
+assert.equal(inAmd.settings.loanRate, withSavings.settings.loanRate);
+assert.equal(inAmd.bills[0].amount, 500 * 400);
+assert.deepEqual(
+  inAmd.entries.map((e) => e.amount),
+  [400 * 400, 100 * 400, 200 * 400]
+);
+assert.equal(inAmd.savings, withSavings.savings);
+assert.equal(convertBudget(budget, 1 / 3, "x").settings.usualIncome, 500); // rounded to cents
+assert.equal(convertBudget(budget, 359.0876, "֏").bills[0].amount, 179544); // whole drams (500 × 359.0876)
+assert.equal(convertBudget(budget, 1 / 359.0876, "$").bills[0].amount, 1.39); // dollars keep cents
+// Same money, new currency: the savings balance in AMD = the USD one × 400 (at a matching AMD-based rate).
+const amdRates = { base: "AMD" as const, date: "2026-11-19", perBase: { USD: 1 / 400, EUR: 0.8 / 400 } };
+assert.equal(Math.round(savingsBalance({ ...inAmd, rates: amdRates })), Math.round(savingsBalance(withSavings) * 400));
 
 console.log("engine: all checks passed");

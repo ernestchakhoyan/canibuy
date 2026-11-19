@@ -1,11 +1,11 @@
-import type { Bill, Budget, Category, Entry, Order, Personal, Project, ProjectPart, Settings } from "@type";
+import type { Bill, Budget, Category, Entry, Order, Personal, Project, ProjectPart, Saving, Settings } from "@type";
 import { projectsOf } from "./engine";
 
 // Pure rules of the Google Sheet sync (the store runs them). Kept here so `bun run test` can check them.
 
 /** "setup" = the Setup tab's settings (A–B) and categories (K–L); "personal" = its Personal block (N–O). */
-export type SheetTab = "orders" | "projects" | "bills" | "entries" | "setup" | "personal";
-export const SHEET_TABS: SheetTab[] = ["orders", "projects", "bills", "entries", "setup", "personal"];
+export type SheetTab = "orders" | "projects" | "bills" | "entries" | "setup" | "personal" | "savings";
+export const SHEET_TABS: SheetTab[] = ["orders", "projects", "bills", "entries", "setup", "personal", "savings"];
 
 /**
  * Kept across reloads. `uploaded`: tabs this device already gave the sheet its data for (after that, the sheet
@@ -26,6 +26,8 @@ export type SheetData = {
   settings: Partial<Settings> | null;
   categories: Category[] | null;
   personal: Partial<Personal> | null;
+  /** `null` = the sheet has no Savings tab yet. */
+  savings: Saving[] | null;
 };
 
 /**
@@ -41,6 +43,7 @@ export const tabsToWrite = (b: Budget, { uploaded, dirty }: SyncMeta) => {
     entries: b.entries.length > 0,
     setup: true, // a device always has settings: upload them once, then the sheet leads
     personal: true,
+    savings: (b.savings ?? []).length > 0,
   };
   return SHEET_TABS.filter((tab) => dirty.includes(tab) || (!uploaded.includes(tab) && hasData[tab]));
 };
@@ -59,5 +62,6 @@ export const mergeFromSheet = (b: Budget, data: SheetData, dirty: SheetTab[]): B
       categories: data.categories ?? b.categories,
     }),
     ...(take("personal") && { personal: { ...b.personal, ...data.personal } }),
+    ...(take("savings") && { savings: data.savings ?? b.savings }),
   };
 };

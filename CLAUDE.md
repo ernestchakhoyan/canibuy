@@ -42,6 +42,10 @@ Data flows one way: `src/app/[locale]/<route>/page.tsx` → builder (`@builder`)
   reloads), then reads the sheet back into every clean tab. Columns are found by header name. Setup's settings (A–B,
   merged key by key), categories (K–L) and the Personal block (N–O: appearance, language, the amounts eye) sync too.
   A language read back from the sheet that differs from the one on screen sets the locale cookie and reloads once.
+- **Savings per currency** (`budget.savings`, Savings tab): converted to the base currency (Setup's symbol → `baseCurrency`)
+  with rates from the open-source fawazahmed0/exchange-api, fetched in `src/server/rates.ts` (`"use cache"`, hours) and
+  stored on the device as `budget.rates` (not synced). The converted total is part of `savingsBalance`, so every
+  calculation uses it.
 - **Engine** (`src/helper/engine.ts`): pure functions implementing PRD section 7. Nothing calculated is stored —
   everything is derived from raw entries on each render.
 - **Auth (M1):** Auth.js v5 in `src/server/auth.ts`, Google REST calls over `fetch` in `src/server/google.ts`, server

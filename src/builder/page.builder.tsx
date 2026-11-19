@@ -14,6 +14,7 @@ import {
   PersonalForm,
   ProjectDetails,
   ProjectList,
+  SavingsAccounts,
   SavingsForm,
   SavingsOverview,
   SettingsForm,
@@ -76,6 +77,7 @@ export const IncomeBuilder = () => (
 export const SavingsBuilder = () => (
   <Page title="savings">
     <SavingsOverview />
+    <SavingsAccounts />
     <SavingsForm />
   </Page>
 );

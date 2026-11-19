@@ -24,5 +24,6 @@ export const defaultBudget = (): Budget => {
     orders: [],
     parts: [],
     projects: [],
+    savings: [],
   };
 };

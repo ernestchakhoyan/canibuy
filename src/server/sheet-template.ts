@@ -3,6 +3,7 @@ import type {
   Bill,
   Budget,
   Category,
+  CurrencyCode,
   Entry,
   EntryType,
   Locale,
@@ -11,6 +12,7 @@ import type {
   Personal,
   Project,
   ProjectPart,
+  Saving,
   Settings,
 } from "@type";
 
@@ -18,7 +20,7 @@ import type {
 // tabs, headers, frozen + warning-protected row 1, named ranges, a hidden month template and the current month.
 // Pure (no "server-only") so `bun run test` can check it outside Next.
 
-export const TEMPLATE_VERSION = 2; // 2: bills moved from Setup D–I to their own Bills tab
+export const TEMPLATE_VERSION = 3; // 2: bills got their own tab; 3: Savings tab (savings per currency)
 export const SPREADSHEET_TITLE = "canibuy";
 
 /** The "Personal" key/value block on the Setup tab, N–O (`buildSpreadsheet` places it, `personalUpdate` rewrites it). */
@@ -30,7 +32,15 @@ export const personalRows = (p: Personal): [string, string | boolean][] => [
   ["amounts_hidden", p.amountsHidden ?? true],
 ];
 
-export const SHEET_ID = { setup: 0, orders: 1, projects: 2, monthTemplate: 3, currentMonth: 4, bills: 5 } as const;
+export const SHEET_ID = {
+  setup: 0,
+  orders: 1,
+  projects: 2,
+  monthTemplate: 3,
+  currentMonth: 4,
+  bills: 5,
+  savings: 6,
+} as const;
 
 /** Orders tab header (row 1). `ordersUpdate` writes rows in this column order. */
 export const ORDER_COLUMNS = [
@@ -261,6 +271,7 @@ export const buildSpreadsheet = (budget: Budget, month: string) => {
         },
       ]),
       sheet(SHEET_ID.bills, "Bills", [{ column: 0, rows: [BILL_COLUMNS] }]),
+      sheet(SHEET_ID.savings, "Savings", [{ column: 0, rows: [SAVING_COLUMNS] }]),
       sheet(SHEET_ID.monthTemplate, "_MonthTemplate", monthTables(""), true),
       sheet(SHEET_ID.currentMonth, month, monthTables(month)),
     ],
@@ -324,6 +335,19 @@ export const billsUpdate = (sheetId: number, bills: Bill[]) =>
       optText(b.projectId),
       optText(b.project),
     ])
+  ).requests;
+
+// ── Savings tab ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Savings tab header: savings kept per currency (the app converts them to the base currency). */
+export const SAVING_COLUMNS = ["id", "name", "amount", "currency"];
+
+/** Makes the Savings tab exactly header + `savings`. */
+export const savingsUpdate = (sheetId: number, savings: Saving[]) =>
+  tabUpdate(
+    sheetId,
+    SAVING_COLUMNS,
+    savings.map((s) => [text(s.id), text(s.name), number(s.amount), text(s.currency)])
   ).requests;
 
 // ── Month tabs (entries) ─────────────────────────────────────────────────────────────────────────────────────
@@ -438,6 +462,7 @@ const ENTRY_TYPES: EntryType[] = ["expense", "income_salary", "income_extra", "s
 const opt = (v: string) => v || undefined;
 const APP_MODES: AppMode[] = ["system", "light", "dark"];
 const LOCALES: Locale[] = ["en", "hy", "ru"];
+const CURRENCY_CODES: CurrencyCode[] = ["AMD", "USD", "EUR", "RUB", "GBP"];
 
 /**
  * Parses what `readSheet` fetched into budget data. Rows a person broke while editing the sheet (no id, a price
@@ -451,6 +476,7 @@ export const parseSheet = (tables: {
   settings?: Table;
   categories?: Table;
   personal?: Table;
+  savings?: Table;
 }) => {
   const orders: Order[] = [];
   for (const r of records(tables.orders)) {
@@ -590,7 +616,19 @@ export const parseSheet = (tables: {
     };
   }
 
-  return { orders, projects: [...projects.values()], parts, bills, entries, settings, categories, personal };
+  // Savings: null when the sheet has no Savings tab yet (keep the app's), else exactly its valid rows.
+  let savings: Saving[] | null = null;
+  if (tables.savings && tables.savings.length > 0) {
+    savings = [];
+    for (const r of records(tables.savings)) {
+      const amount = num(r.amount);
+      const currency = str(r.currency).toUpperCase() as CurrencyCode;
+      if (!str(r.id) || amount === null || !CURRENCY_CODES.includes(currency)) continue;
+      savings.push({ id: str(r.id), name: str(r.name), amount, currency });
+    }
+  }
+
+  return { orders, projects: [...projects.values()], parts, bills, entries, settings, categories, personal, savings };
 };
 
 export type SheetData = ReturnType<typeof parseSheet>;
