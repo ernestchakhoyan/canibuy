@@ -10,7 +10,8 @@ export const parseAmount = (input: string): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-export const formatMoney = (amount: number, currency: string) =>
-  `${amount < 0 ? "−" : ""}${currency}${Math.abs(amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+/** `locale` is the app's (next-intl `useLocale()`), not the browser's, so digits group the way the UI reads. */
+export const formatMoney = (amount: number, currency: string, locale: string) =>
+  `${amount < 0 ? "−" : ""}${currency}${Math.abs(amount).toLocaleString(locale, { maximumFractionDigits: 2 })}`;
 
 export const newId = () => crypto.randomUUID().replaceAll("-", "").slice(0, 8);

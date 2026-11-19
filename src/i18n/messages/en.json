@@ -1,0 +1,311 @@
+{
+  "meta": {
+    "description": "How much can I save this month, and can I afford this?"
+  },
+  "pages": {
+    "month": "This month",
+    "income": "Income",
+    "savings": "Savings",
+    "orders": "Orders",
+    "projects": "Projects",
+    "history": "History",
+    "setup": "Setup",
+    "connect": "Connect your Google Sheet"
+  },
+  "nav": {
+    "month": "Month",
+    "orders": "Orders",
+    "savings": "Savings",
+    "projects": "Projects",
+    "income": "Income",
+    "history": "History",
+    "setup": "Setup",
+    "more": "More",
+    "main": "Main"
+  },
+  "common": {
+    "loading": "Loading your budget…"
+  },
+  "connect": {
+    "headline": "How much can I save this month, and <em>can I afford this?</em>"
+  },
+  "personal": {
+    "title": "Personal",
+    "appearance": "Appearance",
+    "mode": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "language": "Language"
+  },
+  "income": {
+    "addTitle": "Add income",
+    "amount": "Amount",
+    "month": "Month",
+    "type": "Income type",
+    "salary": "Salary (replaces usual income)",
+    "extra": "Extra",
+    "note": "Note",
+    "optional": "Optional",
+    "add": "Add income",
+    "errorAmount": "Enter an amount above 0",
+    "listTitle": "This month and upcoming",
+    "expected": "{month}: {amount} expected",
+    "emptyTitle": "No income entries",
+    "emptyDescription": "Months without a salary use your usual income."
+  },
+  "savings": {
+    "balance": "Savings balance",
+    "cushion": "Safety cushion",
+    "cushionHint": "{count, plural, one {# month} other {# months}} of bills",
+    "available": "Available for orders and projects",
+    "moveTitle": "Move money",
+    "amount": "Amount",
+    "forOrder": "For order",
+    "none": "None",
+    "note": "Note",
+    "optional": "Optional",
+    "add": "Add to savings",
+    "take": "Take out",
+    "errorAmount": "Enter an amount above 0",
+    "errorBalance": "You can't take more than your balance",
+    "historyTitle": "Savings history",
+    "opening": "Opening savings: {amount}"
+  },
+  "history": {
+    "period": "Period",
+    "periods": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "year": "Year"
+    },
+    "previous": "Previous period",
+    "next": "Next period",
+    "date": "Date",
+    "today": "Today",
+    "income": "Income",
+    "outcomes": "Outcomes",
+    "saved": "Saved",
+    "taken": "Taken out",
+    "left": "Left",
+    "byCategory": "By category",
+    "uncategorized": "Uncategorized",
+    "share": "{category} share",
+    "entries": "Entries",
+    "filter": "Filter entries",
+    "filters": {
+      "all": "All",
+      "income": "Income",
+      "outcomes": "Outcomes",
+      "savings": "Savings"
+    },
+    "emptyTitle": "Nothing here yet",
+    "emptyDescription": "No entries in this period."
+  },
+  "month": {
+    "setup": {
+      "title": "Let's get you set up",
+      "description": "Start by entering your usual income, savings and bills.",
+      "action": "Go to Setup"
+    },
+    "canStillSave": "Can still save this month",
+    "left": "Left this month",
+    "dailyAllowance": "Daily allowance",
+    "daysLeft": "{count, plural, one {# day left} other {# days left}}",
+    "projectedSpend": "Projected spend",
+    "spentSoFar": "{amount} so far",
+    "savingsBalance": "Savings balance",
+    "byCategory": "Spending by category",
+    "categoryShare": "{category} share of spending",
+    "expenses": "This month's expenses",
+    "empty": {
+      "title": "No expenses yet",
+      "description": "Add one above and it will show up here."
+    }
+  },
+  "expense": {
+    "title": "Add expense",
+    "amount": "Amount",
+    "category": "Category",
+    "date": "Date",
+    "note": "Note",
+    "optional": "Optional",
+    "submit": "Add expense",
+    "amountError": "Enter an amount above 0"
+  },
+  "entry": {
+    "type": {
+      "expense": "Expense",
+      "income_salary": "Salary",
+      "income_extra": "Extra income",
+      "saving": "Saved",
+      "withdrawal": "From savings",
+      "bill_paid": "Bill paid"
+    },
+    "delete": "Delete {name}"
+  },
+  "orders": {
+    "form": {
+      "title": "Can I afford it?",
+      "item": "Item",
+      "itemPlaceholder": "TV, sofa, laptop…",
+      "price": "Price",
+      "deadline": "Deadline (months)",
+      "optional": "Optional",
+      "priceError": "Enter a price above 0",
+      "submit": "Check order"
+    },
+    "status": {
+      "Planned": "Planned",
+      "Saving": "Saving",
+      "Bought": "Bought",
+      "Dropped": "Dropped"
+    },
+    "verdict": {
+      "pay_now": "You can pay now",
+      "save_up": "Save up first",
+      "loan": "A loan is an option",
+      "not_affordable": "Not affordable now"
+    },
+    "card": {
+      "payNow": "Pay now",
+      "yes": "Yes",
+      "notYet": "Not yet",
+      "saveUp": "Save up",
+      "months": "{count, plural, one {# mo} other {# mo}}",
+      "loan": "Loan",
+      "perMonth": "{amount}/mo",
+      "interest": "+{amount} interest",
+      "saved": "Saved {saved} of {price}",
+      "savedLabel": "Saved toward order",
+      "markBought": "Mark bought",
+      "drop": "Drop",
+      "boughtOn": "Bought on {date}"
+    },
+    "empty": {
+      "title": "No orders yet",
+      "description": "Add one above to see if you can afford it."
+    }
+  },
+  "projects": {
+    "form": {
+      "title": "New project",
+      "project": "Project",
+      "projectPlaceholder": "Home renovation",
+      "costError": "Enter a cost above 0",
+      "submit": "Create project"
+    },
+    "part": {
+      "name": "Part",
+      "namePlaceholder": "Furniture",
+      "cost": "Cost",
+      "payIn": "Pay in",
+      "add": "Add part"
+    },
+    "card": {
+      "left": "{amount} left",
+      "covered": "Covered by savings and salary.",
+      "needsLoan": "Needs a loan of {amount}: {payment}/mo, +{interest} interest.",
+      "affordableFrom": "Without a loan, affordable from {month}.",
+      "notAffordable": "Not affordable without a loan within 10 years.",
+      "paidOn": "Paid {date}",
+      "paymentMonth": "Payment month for {name}",
+      "pay": "Pay",
+      "remove": "Remove {name}"
+    },
+    "table": {
+      "caption": "Month by month",
+      "month": "Month",
+      "in": "In",
+      "paid": "Paid",
+      "balance": "Balance"
+    },
+    "empty": {
+      "title": "No projects yet",
+      "description": "Plan multi-month spending, like a renovation, above."
+    }
+  },
+  "setup": {
+    "save": "Save",
+    "saved": "Saved",
+    "remove": "Remove {name}",
+    "settings": {
+      "title": "Money basics",
+      "currency": "Currency symbol",
+      "usualIncome": "Usual monthly income",
+      "openingSavings": "Current savings",
+      "cushionMonths": "Safety cushion (months of bills)",
+      "loanRate": "Loan interest (% per year)",
+      "loanTermMonths": "Loan term (months)"
+    },
+    "bills": {
+      "title": "Recurring bills",
+      "billLine": "{name} · day {day}",
+      "name": "Name",
+      "namePlaceholder": "Rent",
+      "amount": "Amount",
+      "dueDay": "Due day",
+      "category": "Category",
+      "add": "Add bill",
+      "amountError": "Enter an amount above 0"
+    },
+    "categories": {
+      "title": "Categories",
+      "new": "New category",
+      "add": "Add"
+    }
+  },
+  "auth": {
+    "connect": {
+      "intro": "Your budget lives in a Google Sheet in your own Drive. Nothing is stored on our servers. Google will ask you to let the app create that sheet.",
+      "promises": {
+        "onlyOwnSheet": "The app can only see the sheet it creates, nothing else in your Drive.",
+        "editAnytime": "You can open and edit the sheet yourself at any time.",
+        "findsExisting": "If you connected before, the app finds your existing sheet instead of making a new one."
+      },
+      "button": "Connect Google Sheet"
+    },
+    "errors": {
+      "NoDriveAccess": "Google didn't give the app access to Drive. On Google's screen, tick the box to let Canibuy see, edit and create the Google Drive files it uses, then try again.",
+      "SheetFailed": "You're connected, but creating your sheet failed. Check that the Google Sheets API and Google Drive API are enabled in the Google Cloud project, then try again.",
+      "RefreshFailed": "Your Google access expired or was revoked. Connect again to keep using your sheet.",
+      "details": "Details: {detail}"
+    },
+    "account": {
+      "title": "Account",
+      "connectedAs": "Connected as <b>{email}</b>",
+      "openSheet": "Open my Google Sheet",
+      "signOut": "Sign out",
+      "disconnect": "Disconnect",
+      "disconnectNote": "Disconnecting revokes the app's access. Your sheet stays in your Drive."
+    }
+  },
+  "quickAdd": {
+    "title": "Quick add",
+    "prompt": "What do you want to do?",
+    "back": "Back to quick actions",
+    "actions": {
+      "expense": {
+        "label": "Add expense",
+        "hint": "Something you just paid for"
+      },
+      "income": {
+        "label": "Add income",
+        "hint": "Salary or extra money"
+      },
+      "savings": {
+        "label": "Move money",
+        "hint": "Into or out of savings"
+      },
+      "order": {
+        "label": "Can I afford it?",
+        "hint": "Check a purchase"
+      }
+    }
+  },
+  "sheet": {
+    "close": "Close"
+  }
+}

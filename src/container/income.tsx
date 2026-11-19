@@ -23,12 +23,15 @@ import {
   RadioGroupItem,
 } from "@widget";
 import { PlusIcon } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { type FormEvent, useId, useState } from "react";
 
 const MONTHS_AHEAD = 24;
 
 /** `onDone` runs after a successful save (the quick-add sheet closes itself with it). */
 export function IncomeForm({ onDone }: { onDone?: () => void }) {
+  const t = useTranslations("income");
+  const locale = useLocale();
   const id = useId(); // also rendered in the quick-add sheet, so ids must be unique
   const [error, setError] = useState("");
   const today = todayISO();
@@ -39,7 +42,7 @@ export function IncomeForm({ onDone }: { onDone?: () => void }) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const amount = parseAmount(String(form.get("amount")));
-    if (!amount || amount <= 0) return setError("Enter an amount above 0");
+    if (!amount || amount <= 0) return setError(t("errorAmount"));
     const month = String(form.get("month"));
     budgetActions.addEntry({
       type: form.get("type") === "salary" ? "income_salary" : "income_extra",
@@ -53,11 +56,11 @@ export function IncomeForm({ onDone }: { onDone?: () => void }) {
   };
 
   return (
-    <Card title="Add income">
+    <Card title={t("addTitle")}>
       <form onSubmit={submit}>
         <FieldGroup className="grid grid-cols-2 gap-4">
           <Field data-invalid={!!error || undefined}>
-            <FieldLabel htmlFor={`${id}-amount`}>Amount</FieldLabel>
+            <FieldLabel htmlFor={`${id}-amount`}>{t("amount")}</FieldLabel>
             <Input
               id={`${id}-amount`}
               name="amount"
@@ -69,39 +72,39 @@ export function IncomeForm({ onDone }: { onDone?: () => void }) {
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor={`${id}-month`}>Month</FieldLabel>
+            <FieldLabel htmlFor={`${id}-month`}>{t("month")}</FieldLabel>
             <NativeSelect id={`${id}-month`} name="month" className="w-full">
               {months.map((m) => (
                 <NativeSelectOption key={m} value={m}>
-                  {monthLabel(m)}
+                  {monthLabel(m, locale)}
                 </NativeSelectOption>
               ))}
             </NativeSelect>
           </Field>
           <FieldSet className="col-span-2">
-            <RadioGroup name="type" defaultValue="salary" aria-label="Income type" className="flex flex-wrap gap-x-6">
+            <RadioGroup name="type" defaultValue="salary" aria-label={t("type")} className="flex flex-wrap gap-x-6">
               <Field orientation="horizontal" className="min-h-11 w-auto">
                 <RadioGroupItem value="salary" id={`${id}-salary`} />
                 <Label htmlFor={`${id}-salary`} className="font-normal">
-                  Salary (replaces usual income)
+                  {t("salary")}
                 </Label>
               </Field>
               <Field orientation="horizontal" className="min-h-11 w-auto">
                 <RadioGroupItem value="extra" id={`${id}-extra`} />
                 <Label htmlFor={`${id}-extra`} className="font-normal">
-                  Extra
+                  {t("extra")}
                 </Label>
               </Field>
             </RadioGroup>
           </FieldSet>
           <Field className="col-span-2">
-            <FieldLabel htmlFor={`${id}-note`}>Note</FieldLabel>
-            <Input id={`${id}-note`} name="note" placeholder="Optional" />
+            <FieldLabel htmlFor={`${id}-note`}>{t("note")}</FieldLabel>
+            <Input id={`${id}-note`} name="note" placeholder={t("optional")} />
           </Field>
           {error && <FieldError className="col-span-2">{error}</FieldError>}
           <Button type="submit" className="col-span-2">
             <PlusIcon data-icon="inline-start" />
-            Add income
+            {t("add")}
           </Button>
         </FieldGroup>
       </form>
@@ -110,8 +113,10 @@ export function IncomeForm({ onDone }: { onDone?: () => void }) {
 }
 
 export function IncomeList() {
+  const t = useTranslations("income");
+  const locale = useLocale();
   const b = useLoadedBudget();
-  const money = (n: number) => formatMoney(n, b.settings.currency);
+  const money = (n: number) => formatMoney(n, b.settings.currency, locale);
   const current = monthOf(todayISO());
   const income = b.entries
     .filter((e) => (e.type === "income_salary" || e.type === "income_extra") && monthOf(e.date) >= current)
@@ -119,14 +124,14 @@ export function IncomeList() {
 
   return (
     <Card
-      title="This month and upcoming"
-      description={`${monthLabel(current)}: ${money(monthIncome(b, current))} expected`}
+      title={t("listTitle")}
+      description={t("expected", { month: monthLabel(current, locale), amount: money(monthIncome(b, current)) })}
     >
       {income.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>
-            <EmptyTitle>No income entries</EmptyTitle>
-            <EmptyDescription>Months without a salary use your usual income.</EmptyDescription>
+            <EmptyTitle>{t("emptyTitle")}</EmptyTitle>
+            <EmptyDescription>{t("emptyDescription")}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (

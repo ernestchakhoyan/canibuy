@@ -1,16 +1,8 @@
 import { cn } from "@helper";
 import type { Entry } from "@type";
 import { ArrowDownLeftIcon, ArrowUpRightIcon, PiggyBankIcon, ReceiptIcon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "./ui/button";
-
-const typeLabel: Record<Entry["type"], string> = {
-  expense: "Expense",
-  income_salary: "Salary",
-  income_extra: "Extra income",
-  saving: "Saved",
-  withdrawal: "From savings",
-  bill_paid: "Bill paid",
-};
 
 const typeIcon: Record<Entry["type"], typeof ReceiptIcon> = {
   expense: ArrowUpRightIcon,
@@ -26,6 +18,8 @@ const isIncoming = (e: Entry) => e.type === "income_salary" || e.type === "incom
 type Props = { entry: Entry; money: (n: number) => string; onDelete?: () => void };
 
 export function EntryRow({ entry, money, onDelete }: Props) {
+  const t = useTranslations("entry");
+  const typeLabel = t(`type.${entry.type}`);
   const Icon = typeIcon[entry.type];
   const incoming = isIncoming(entry);
 
@@ -40,9 +34,9 @@ export function EntryRow({ entry, money, onDelete }: Props) {
         <Icon className="size-4" aria-hidden="true" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-medium">{entry.note || entry.category || typeLabel[entry.type]}</span>
+        <span className="truncate text-sm font-medium">{entry.note || entry.category || typeLabel}</span>
         <span className="truncate text-xs text-muted-foreground">
-          {entry.date} · {typeLabel[entry.type]}
+          {entry.date} · {typeLabel}
           {entry.category && entry.note ? ` · ${entry.category}` : ""}
         </span>
       </div>
@@ -55,7 +49,7 @@ export function EntryRow({ entry, money, onDelete }: Props) {
           variant="ghost"
           size="icon-sm"
           onClick={onDelete}
-          aria-label={`Delete ${entry.note || typeLabel[entry.type]}`}
+          aria-label={t("delete", { name: entry.note || typeLabel })}
         >
           <XIcon />
         </Button>

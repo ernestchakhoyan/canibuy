@@ -29,8 +29,8 @@ export const addDays = (date: string, n: number) => {
   return toISODate(d);
 };
 
-export const monthLabel = (month: string) =>
-  new Date(`${month}-01T00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+export const monthLabel = (month: string, locale: string) =>
+  new Date(`${month}-01T00:00`).toLocaleDateString(locale, { month: "long", year: "numeric" });
 
 export type Period = "day" | "week" | "month" | "year";
 

@@ -15,6 +15,7 @@ const budget: Budget = {
     loanTermMonths: 12,
     startMonth: "2026-09",
   },
+  personal: { appMode: "system", locale: "en" },
   bills: [{ id: "b1", name: "Rent", amount: 500, dueDay: 1, category: "Home", active: true }],
   categories: [],
   entries: [

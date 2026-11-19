@@ -80,6 +80,11 @@ export const buildSpreadsheet = (budget: Budget, month: string) => {
     ["start_month", s.startMonth],
     ["template_version", TEMPLATE_VERSION],
   ];
+  const personalRows: Value[][] = [
+    ["key", "value"],
+    ["app_mode", budget.personal.appMode],
+    ["locale", budget.personal.locale],
+  ];
   const billRows: Value[][] = [
     ["id", "name", "amount", "due_day", "category", "active"],
     ...budget.bills.map((b) => [b.id, b.name, b.amount, b.dueDay, b.category, b.active]),
@@ -106,6 +111,7 @@ export const buildSpreadsheet = (budget: Budget, month: string) => {
         { column: 0, rows: settingsRows }, // A–B
         { column: 3, rows: billRows }, // D–I
         { column: 10, rows: categoryRows }, // K–L
+        { column: 13, rows: personalRows }, // N–O
       ]),
       sheet(SHEET_ID.orders, "Orders", [
         {
@@ -126,6 +132,7 @@ export const buildSpreadsheet = (budget: Budget, month: string) => {
       { name: "Settings", range: range(0, 2) },
       { name: "Bills", range: range(3, 9) },
       { name: "Categories", range: range(10, 12) },
+      { name: "Personal", range: range(13, 15) },
       { name: "UsualIncome", range: range(1, 2, usualIncomeRow, usualIncomeRow + 1) },
       { name: "Bills_amount", range: range(5, 6, 1) },
       { name: "Bills_active", range: range(8, 9, 1) },

@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@widget";
 import { CheckCircle2Icon, HammerIcon, LandmarkIcon, PlusIcon, XIcon } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { type FormEvent, useId, useState } from "react";
 
 const MONTHS_AHEAD = 24;
@@ -41,23 +42,25 @@ const monthOptions = () => {
 
 /** Part fields shared by the new-project form and the add-part form. */
 function PartFields() {
+  const t = useTranslations("projects");
+  const locale = useLocale();
   const id = useId(); // rendered once per project card, so ids must be unique
   return (
     <>
       <Field className="col-span-2">
-        <FieldLabel htmlFor={`${id}-part`}>Part</FieldLabel>
-        <Input id={`${id}-part`} name="part" required placeholder="Furniture" />
+        <FieldLabel htmlFor={`${id}-part`}>{t("part.name")}</FieldLabel>
+        <Input id={`${id}-part`} name="part" required placeholder={t("part.namePlaceholder")} />
       </Field>
       <Field>
-        <FieldLabel htmlFor={`${id}-cost`}>Cost</FieldLabel>
+        <FieldLabel htmlFor={`${id}-cost`}>{t("part.cost")}</FieldLabel>
         <Input id={`${id}-cost`} name="cost" inputMode="decimal" required autoComplete="off" placeholder="20,000" />
       </Field>
       <Field>
-        <FieldLabel htmlFor={`${id}-month`}>Pay in</FieldLabel>
+        <FieldLabel htmlFor={`${id}-month`}>{t("part.payIn")}</FieldLabel>
         <NativeSelect id={`${id}-month`} name="payMonth" className="w-full">
           {monthOptions().map((m) => (
             <NativeSelectOption key={m} value={m}>
-              {monthLabel(m)}
+              {monthLabel(m, locale)}
             </NativeSelectOption>
           ))}
         </NativeSelect>
@@ -73,31 +76,32 @@ const readPart = (form: FormData) => {
 };
 
 export function ProjectForm() {
+  const t = useTranslations("projects");
   const [error, setError] = useState("");
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const part = readPart(form);
-    if (!part) return setError("Enter a cost above 0");
+    if (!part) return setError(t("form.costError"));
     budgetActions.addProject(String(form.get("project")).trim(), [part]);
     setError("");
     event.currentTarget.reset();
   };
 
   return (
-    <Card title="New project">
+    <Card title={t("form.title")}>
       <form onSubmit={submit}>
         <FieldGroup className="grid grid-cols-2 gap-4">
           <Field className="col-span-2">
-            <FieldLabel htmlFor="project-name">Project</FieldLabel>
-            <Input id="project-name" name="project" required placeholder="Home renovation" />
+            <FieldLabel htmlFor="project-name">{t("form.project")}</FieldLabel>
+            <Input id="project-name" name="project" required placeholder={t("form.projectPlaceholder")} />
           </Field>
           <PartFields />
           {error && <FieldError className="col-span-2">{error}</FieldError>}
           <Button type="submit" className="col-span-2">
             <PlusIcon data-icon="inline-start" />
-            Create project
+            {t("form.submit")}
           </Button>
         </FieldGroup>
       </form>
@@ -106,6 +110,7 @@ export function ProjectForm() {
 }
 
 function AddPartForm({ projectId }: { projectId: string }) {
+  const t = useTranslations("projects");
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const part = readPart(new FormData(event.currentTarget));
@@ -118,14 +123,14 @@ function AddPartForm({ projectId }: { projectId: string }) {
     <Collapsible>
       <CollapsibleTrigger render={<Button variant="outline" className="w-full" />}>
         <PlusIcon data-icon="inline-start" />
-        Add part
+        {t("part.add")}
       </CollapsibleTrigger>
       <CollapsibleContent>
         <form onSubmit={submit} className="pt-4">
           <FieldGroup className="grid grid-cols-2 gap-4">
             <PartFields />
             <Button type="submit" className="col-span-2">
-              Add part
+              {t("part.add")}
             </Button>
           </FieldGroup>
         </form>
@@ -135,8 +140,10 @@ function AddPartForm({ projectId }: { projectId: string }) {
 }
 
 function ProjectCard({ projectId, parts }: { projectId: string; parts: ProjectPart[] }) {
+  const t = useTranslations("projects");
+  const locale = useLocale();
   const b = useLoadedBudget();
-  const money = (n: number) => formatMoney(Math.round(n), b.settings.currency);
+  const money = (n: number) => formatMoney(Math.round(n), b.settings.currency, locale);
   const plan = projectPlan(b, projectId, todayISO());
   const months = monthOptions();
 
@@ -145,7 +152,7 @@ function ProjectCard({ projectId, parts }: { projectId: string; parts: ProjectPa
       title={parts[0].project}
       action={
         <Badge variant="secondary" className="tabular-nums">
-          {money(plan.total)} left
+          {t("card.left", { amount: money(plan.total) })}
         </Badge>
       }
     >
@@ -153,19 +160,22 @@ function ProjectCard({ projectId, parts }: { projectId: string; parts: ProjectPa
         (plan.covered ? (
           <p className="flex items-center gap-2 rounded-lg bg-positive/10 px-3 py-2 text-sm font-semibold text-positive">
             <CheckCircle2Icon className="size-4" aria-hidden="true" />
-            Covered by savings and salary.
+            {t("card.covered")}
           </p>
         ) : (
           <div className="flex flex-col gap-1 rounded-lg bg-warning/10 px-3 py-2 text-sm">
             <p className="flex items-center gap-2 font-semibold text-warning">
               <LandmarkIcon className="size-4 shrink-0" aria-hidden="true" />
-              Needs a loan of {money(plan.loan?.amount ?? 0)}: {money(plan.loan?.payment ?? 0)}/mo, +
-              {money(plan.loan?.totalInterest ?? 0)} interest.
+              {t("card.needsLoan", {
+                amount: money(plan.loan?.amount ?? 0),
+                payment: money(plan.loan?.payment ?? 0),
+                interest: money(plan.loan?.totalInterest ?? 0),
+              })}
             </p>
             <p className="text-muted-foreground">
               {plan.affordableMonth
-                ? `Without a loan, affordable from ${monthLabel(plan.affordableMonth)}.`
-                : "Not affordable without a loan within 10 years."}
+                ? t("card.affordableFrom", { month: monthLabel(plan.affordableMonth, locale) })
+                : t("card.notAffordable")}
             </p>
           </div>
         ))}
@@ -178,27 +188,27 @@ function ProjectCard({ projectId, parts }: { projectId: string; parts: ProjectPa
               <span className="text-xs text-muted-foreground tabular-nums">{money(p.cost)}</span>
             </div>
             {p.status === "Paid" ? (
-              <Badge variant="outline">Paid {p.paidDate}</Badge>
+              <Badge variant="outline">{t("card.paidOn", { date: p.paidDate })}</Badge>
             ) : (
               <div className="flex items-center gap-2">
                 <NativeSelect
-                  aria-label={`Payment month for ${p.part}`}
+                  aria-label={t("card.paymentMonth", { name: p.part })}
                   value={p.payMonth}
                   onChange={(e) => budgetActions.movePart(p.partId, e.target.value)}
                 >
                   {(months.includes(p.payMonth) ? months : [p.payMonth, ...months]).map((m) => (
                     <NativeSelectOption key={m} value={m}>
-                      {monthLabel(m)}
+                      {monthLabel(m, locale)}
                     </NativeSelectOption>
                   ))}
                 </NativeSelect>
                 <Button variant="secondary" onClick={() => budgetActions.payPart(p.partId)}>
-                  Pay
+                  {t("card.pay")}
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`Remove ${p.part}`}
+                  aria-label={t("card.remove", { name: p.part })}
                   onClick={() => budgetActions.removePart(p.partId)}
                 >
                   <XIcon />
@@ -211,13 +221,13 @@ function ProjectCard({ projectId, parts }: { projectId: string; parts: ProjectPa
 
       {plan.total > 0 && (
         <Table className="tabular-nums">
-          <TableCaption className="caption-top text-left text-xs">Month by month</TableCaption>
+          <TableCaption className="caption-top text-left text-xs">{t("table.caption")}</TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead>Month</TableHead>
-              <TableHead className="text-right">In</TableHead>
-              <TableHead className="text-right">Paid</TableHead>
-              <TableHead className="text-right">Balance</TableHead>
+              <TableHead>{t("table.month")}</TableHead>
+              <TableHead className="text-right">{t("table.in")}</TableHead>
+              <TableHead className="text-right">{t("table.paid")}</TableHead>
+              <TableHead className="text-right">{t("table.balance")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -239,6 +249,7 @@ function ProjectCard({ projectId, parts }: { projectId: string; parts: ProjectPa
 }
 
 export function ProjectList() {
+  const t = useTranslations("projects");
   const b = useLoadedBudget();
   const projects = Map.groupBy(b.parts, (p) => p.projectId);
 
@@ -248,8 +259,8 @@ export function ProjectList() {
         <EmptyMedia variant="icon">
           <HammerIcon />
         </EmptyMedia>
-        <EmptyTitle>No projects yet</EmptyTitle>
-        <EmptyDescription>Plan multi-month spending, like a renovation, above.</EmptyDescription>
+        <EmptyTitle>{t("empty.title")}</EmptyTitle>
+        <EmptyDescription>{t("empty.description")}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   ) : (

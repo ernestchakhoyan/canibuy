@@ -10,6 +10,12 @@ export type Settings = {
   startMonth: string;
 };
 
+export type AppMode = "system" | "light" | "dark";
+export type Locale = "en" | "hy" | "ru";
+
+/** Per-person preferences: the "Personal" block of the sheet's Setup tab. */
+export type Personal = { appMode: AppMode; locale: Locale };
+
 export type Bill = { id: string; name: string; amount: number; dueDay: number; category: string; active: boolean };
 
 export type Category = { name: string; monthlyLimit: number };
@@ -53,6 +59,7 @@ export type ProjectPart = {
 
 export type Budget = {
   settings: Settings;
+  personal: Personal;
   bills: Bill[];
   categories: Category[];
   entries: Entry[];

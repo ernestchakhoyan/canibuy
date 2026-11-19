@@ -4,10 +4,13 @@ import { formatMoney, monthOf, spendingByCategory, todayISO } from "@helper";
 import { budgetActions, useLoadedBudget } from "@store";
 import { Card, Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle, EntryRow, Progress } from "@widget";
 import { ReceiptIcon } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 
 export function MonthExpenses() {
+  const t = useTranslations("month");
+  const locale = useLocale();
   const b = useLoadedBudget();
-  const money = (n: number) => formatMoney(n, b.settings.currency);
+  const money = (n: number) => formatMoney(n, b.settings.currency, locale);
   const month = monthOf(todayISO());
   const expenses = b.entries
     .filter((e) => e.type === "expense" && monthOf(e.date) === month)
@@ -18,7 +21,7 @@ export function MonthExpenses() {
   return (
     <>
       {byCategory.length > 0 && (
-        <Card title="Spending by category">
+        <Card title={t("byCategory")}>
           <ul className="flex flex-col gap-3">
             {byCategory.map(({ category, amount }) => (
               <li key={category} className="flex flex-col gap-1.5">
@@ -26,21 +29,21 @@ export function MonthExpenses() {
                   <span>{category}</span>
                   <span className="tabular-nums text-muted-foreground">{money(amount)}</span>
                 </div>
-                <Progress value={amount} max={total} aria-label={`${category} share of spending`} />
+                <Progress value={amount} max={total} aria-label={t("categoryShare", { category })} />
               </li>
             ))}
           </ul>
         </Card>
       )}
-      <Card title="This month's expenses">
+      <Card title={t("expenses")}>
         {expenses.length === 0 ? (
           <Empty className="border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <ReceiptIcon />
               </EmptyMedia>
-              <EmptyTitle>No expenses yet</EmptyTitle>
-              <EmptyDescription>Add one above and it will show up here.</EmptyDescription>
+              <EmptyTitle>{t("empty.title")}</EmptyTitle>
+              <EmptyDescription>{t("empty.description")}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (

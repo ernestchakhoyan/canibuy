@@ -32,6 +32,10 @@ assert.equal(valueAt(0, 0, range("Bills_active").startColumnIndex), "active");
 assert.equal(valueAt(0, 0, range("Categories").startColumnIndex), "name");
 assert.equal(valueAt(0, 8, 1), TEMPLATE_VERSION);
 assert.equal(valueAt(0, 1, 10), "Food"); // default categories written
+assert.equal(range("Personal").startColumnIndex, 13);
+assert.equal(valueAt(0, 1, 13), "app_mode");
+assert.equal(valueAt(0, 1, 14), "system");
+assert.equal(valueAt(0, 2, 13), "locale");
 
 // Month tab: ledger header in A–H, summary in J–K with "Left" on row 7 referencing K2–K6.
 assert.equal(valueAt(4, 0, 0), "id");

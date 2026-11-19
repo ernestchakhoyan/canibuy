@@ -27,7 +27,7 @@ Biome replaces ESLint/Prettier — don't add either.
 
 ## Architecture
 
-Data flows one way: `src/app/<route>/page.tsx` → builder (`@builder`) → containers (`@container`) → store (`@store`)
+Data flows one way: `src/app/[locale]/<route>/page.tsx` → builder (`@builder`) → containers (`@container`) → store (`@store`)
 → engine (`@helper`).
 
 - **Pages** only render their builder. **Builders** (`src/builder/page.builder.tsx`) set the page title and wrap the
@@ -47,6 +47,11 @@ Data flows one way: `src/app/<route>/page.tsx` → builder (`@builder`) → cont
 - `src/server/sheet-template.ts` builds the whole sheet (PRD section 6) as one `spreadsheets.create` body; it stays
   free of `server-only` so `bun run test` can check it. Server components that call `auth()` need
   `await connection()` first (Auth.js touches `crypto` before cookies, which Cache Components rejects).
+- **i18n:** next-intl with `en` / `hy` / `ru` (`src/i18n`, alias `@i18n`). The locale is never in the URL: the
+  `NEXT_LOCALE` cookie picks it and `src/proxy.ts` (after the auth check) rewrites to the hidden `src/app/[locale]`
+  segment; the root layout reads it with `next/root-params`. Messages live in `src/i18n/messages/<locale>.json`, typed
+  against `en.json` (`src/@type/next-intl.d.ts`), so a missing key fails `tsc`. Use `Link`/`usePathname` from `@i18n`,
+  and pass `useLocale()` to `formatMoney` / `monthLabel`. User data (category names, notes) is never translated.
 - `AppShell` (root layout) must always render `children`: hiding the page segment on the server breaks Partial
   Prefetching's instant-navigation validation. Put loading gates inside builders instead.
 - `AppShell` gets the quick-add sheet (`QuickAdd` container) as a `quickAdd` prop from the root layout: a `"use client"`
@@ -68,7 +73,9 @@ Data flows one way: `src/app/<route>/page.tsx` → builder (`@builder`) → cont
     `postcss.config`.
 - Tailwind v4 is CSS-first: theme tokens are defined in `src/app/globals.css` via `@theme inline`, no `tailwind.config`.
   Brand tokens ("Ledger green" primary, `brand-gold` / `brand-gold-ink`, money tones `positive`/`negative`/`warning`)
-  live there too; dark mode follows `prefers-color-scheme` (the `dark:` variant is a media query, no theme toggle).
+  live there too. Dark mode is the `.dark` class on `<html>` (`applyAppMode` in `@helper`), driven by the Setup page's
+  appearance (System / Light / Dark, stored in `budget.personal`). An inline `<head>` script (`APP_MODE_SCRIPT`)
+  applies it before paint.
 - UI is shadcn/ui (Base UI primitives, `base-nova` style, lucide icons). `components.json` puts components in
   `src/widget/ui` and re-exports them from the `@widget` barrel — import `Button`, `Field`, … from `@widget`. Add more
   with `bunx --bun shadcn@latest add <name>` and export them from `src/widget/index.ts`. `src/widget/ui` is vendored:

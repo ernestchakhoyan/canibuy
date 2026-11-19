@@ -12,6 +12,7 @@ import {
   MonthOverview,
   OrderForm,
   OrderList,
+  PersonalForm,
   ProjectForm,
   ProjectList,
   SavingsForm,
@@ -20,20 +21,38 @@ import {
   SettingsForm,
 } from "@container";
 import { BudgetGate } from "@layout";
-import { Brand } from "@widget";
-import { type ReactNode, Suspense } from "react";
+import { Logo } from "@widget";
+import { getTranslations } from "next-intl/server";
+import { type ReactNode, Suspense, ViewTransition } from "react";
 
 // One builder per route: each page in src/app renders its builder, which composes the containers.
 
-const Page = ({ title, children }: { title: string; children: ReactNode }) => (
-  <>
-    <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+/**
+ * Route cross-fade (CSS in globals.css). It lives here, not in a layout: layouts persist across navigations, so
+ * enter/exit never fire there. Cache Components hides visited pages in <Activity>, which also counts as enter/exit.
+ */
+const Screen = ({ children }: { children: ReactNode }) => (
+  <ViewTransition enter="page-enter" exit="page-exit" default="none">
+    {children}
+  </ViewTransition>
+);
+
+type PageKey = "month" | "income" | "savings" | "orders" | "projects" | "history" | "setup";
+
+/** Page heading, translated from the `pages` namespace (same keys as the tab titles in each page.tsx). */
+const Title = async ({ page }: { page: PageKey }) => (
+  <h1 className="text-2xl font-semibold tracking-tight">{(await getTranslations("pages"))(page)}</h1>
+);
+
+const Page = ({ title, children }: { title: PageKey; children: ReactNode }) => (
+  <Screen>
+    <Title page={title} />
     <BudgetGate>{children}</BudgetGate>
-  </>
+  </Screen>
 );
 
 export const MonthBuilder = () => (
-  <Page title="This month">
+  <Page title="month">
     <MonthOverview />
     <ExpenseForm />
     <MonthExpenses />
@@ -41,14 +60,14 @@ export const MonthBuilder = () => (
 );
 
 export const IncomeBuilder = () => (
-  <Page title="Income">
+  <Page title="income">
     <IncomeForm />
     <IncomeList />
   </Page>
 );
 
 export const SavingsBuilder = () => (
-  <Page title="Savings">
+  <Page title="savings">
     <SavingsOverview />
     <SavingsForm />
     <SavingsHistory />
@@ -56,49 +75,60 @@ export const SavingsBuilder = () => (
 );
 
 export const OrdersBuilder = () => (
-  <Page title="Orders">
+  <Page title="orders">
     <OrderForm />
     <OrderList />
   </Page>
 );
 
 export const ProjectsBuilder = () => (
-  <Page title="Projects">
+  <Page title="projects">
     <ProjectForm />
     <ProjectList />
   </Page>
 );
 
 export const HistoryBuilder = () => (
-  <Page title="History">
+  <Page title="history">
     <History />
   </Page>
 );
 
 export const SetupBuilder = () => (
-  <>
-    <Page title="Setup">
+  <Screen>
+    <Title page="setup" />
+    <BudgetGate>
+      <PersonalForm />
       <SettingsForm />
       <BillsEditor />
       <CategoriesEditor />
-    </Page>
+    </BudgetGate>
     <Suspense>
       <AccountCard />
     </Suspense>
-  </>
+  </Screen>
 );
 
+const ConnectHeadline = async () => {
+  const t = await getTranslations("connect");
+  return (
+    <h1 className="text-4xl font-semibold tracking-tight text-balance">
+      {t.rich("headline", { em: (chunks) => <span className="text-primary">{chunks}</span> })}
+    </h1>
+  );
+};
+
 export const ConnectBuilder = () => (
-  <div className="flex flex-1 flex-col justify-center gap-8 py-12">
-    <div className="flex flex-col gap-4">
-      <Brand size="lg" />
-      <h1 className="text-4xl font-semibold tracking-tight text-balance">
-        How much can I save this month, and <span className="text-primary">can I afford this?</span>
-      </h1>
+  <Screen>
+    <div className="flex flex-1 flex-col justify-center gap-8 py-12">
+      <div className="flex flex-col gap-4">
+        <Logo size="lg" />
+        <ConnectHeadline />
+      </div>
+      <Suspense>
+        <ConnectStatus />
+      </Suspense>
+      <ConnectSheet />
     </div>
-    <Suspense>
-      <ConnectStatus />
-    </Suspense>
-    <ConnectSheet />
-  </div>
+  </Screen>
 );

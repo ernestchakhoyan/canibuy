@@ -2,8 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Dark mode follows the OS setting; there is no in-app theme toggle. */
-@custom-variant dark (@media (prefers-color-scheme: dark));
+/* Dark mode: `.dark` on <html>, set by `applyAppMode` from the Setup page's appearance (System follows the OS). */
+@custom-variant dark (&:where(.dark, .dark *));
 
 /*
  * Brand: "Ledger green" — emerald primary (money, growth), gold highlight (the "you can buy it" moment),
@@ -43,39 +43,37 @@
   --radius: 0.75rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --brand-gold: oklch(0.82 0.14 85);
-    --brand-gold-foreground: oklch(0.25 0.05 70);
-    --brand-gold-ink: oklch(0.85 0.13 85);
+.dark {
+  --brand-gold: oklch(0.82 0.14 85);
+  --brand-gold-foreground: oklch(0.25 0.05 70);
+  --brand-gold-ink: oklch(0.85 0.13 85);
 
-    --background: oklch(0.16 0.015 175);
-    --foreground: oklch(0.96 0.01 165);
-    --card: oklch(0.205 0.018 172);
-    --card-foreground: oklch(0.96 0.01 165);
-    --popover: oklch(0.205 0.018 172);
-    --popover-foreground: oklch(0.96 0.01 165);
-    --primary: oklch(0.74 0.14 165);
-    --primary-foreground: oklch(0.2 0.04 170);
-    --secondary: oklch(0.27 0.03 170);
-    --secondary-foreground: oklch(0.92 0.03 165);
-    --muted: oklch(0.25 0.018 172);
-    --muted-foreground: oklch(0.7 0.02 168);
-    --accent: oklch(0.27 0.03 170);
-    --accent-foreground: oklch(0.92 0.03 165);
-    --destructive: oklch(0.7 0.18 22);
-    --border: oklch(1 0 0 / 9%);
-    --input: oklch(1 0 0 / 14%);
-    --ring: oklch(0.6 0.12 165);
-    --positive: oklch(0.76 0.15 155);
-    --negative: oklch(0.7 0.18 22);
-    --warning: oklch(0.8 0.14 75);
-    --chart-1: oklch(0.74 0.14 165);
-    --chart-2: oklch(0.82 0.14 85);
-    --chart-3: oklch(0.72 0.1 200);
-    --chart-4: oklch(0.8 0.14 75);
-    --chart-5: oklch(0.55 0.08 170);
-  }
+  --background: oklch(0.16 0.015 175);
+  --foreground: oklch(0.96 0.01 165);
+  --card: oklch(0.205 0.018 172);
+  --card-foreground: oklch(0.96 0.01 165);
+  --popover: oklch(0.205 0.018 172);
+  --popover-foreground: oklch(0.96 0.01 165);
+  --primary: oklch(0.74 0.14 165);
+  --primary-foreground: oklch(0.2 0.04 170);
+  --secondary: oklch(0.27 0.03 170);
+  --secondary-foreground: oklch(0.92 0.03 165);
+  --muted: oklch(0.25 0.018 172);
+  --muted-foreground: oklch(0.7 0.02 168);
+  --accent: oklch(0.27 0.03 170);
+  --accent-foreground: oklch(0.92 0.03 165);
+  --destructive: oklch(0.7 0.18 22);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.6 0.12 165);
+  --positive: oklch(0.76 0.15 155);
+  --negative: oklch(0.7 0.18 22);
+  --warning: oklch(0.8 0.14 75);
+  --chart-1: oklch(0.74 0.14 165);
+  --chart-2: oklch(0.82 0.14 85);
+  --chart-3: oklch(0.72 0.1 200);
+  --chart-4: oklch(0.8 0.14 75);
+  --chart-5: oklch(0.55 0.08 170);
 }
 
 @theme inline {
@@ -133,5 +131,21 @@
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+  }
+}
+
+/* Route cross-fade (`Screen` in page.builder.tsx): opacity only, the old page leaves fast. */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(.page-exit) {
+  animation: 150ms ease-in both page-fade reverse;
+}
+::view-transition-new(.page-enter) {
+  animation: 250ms ease-out 50ms both page-fade;
+}
+@keyframes page-fade {
+  from {
+    opacity: 0;
   }
 }

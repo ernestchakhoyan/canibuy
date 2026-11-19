@@ -1,11 +1,9 @@
-import { defaultBudget, fromSavings, newId, todayISO } from "@helper";
-import type { Bill, Budget, Entry, Order, OrderStatus, ProjectPart, Settings } from "@type";
+import { defaultBudget, fromSavings, newId, BUDGET_STORAGE_KEY as STORAGE_KEY, todayISO } from "@helper";
+import type { Bill, Budget, Entry, Order, OrderStatus, Personal, ProjectPart, Settings } from "@type";
 import { useSyncExternalStore } from "react";
 
 // ponytail: browser-only store (localStorage). Entries move to the Google Sheet in M2;
 // the local copy stays as the offline queue the PRD asks for.
-
-const STORAGE_KEY = "smart-money:v1";
 
 let state: Budget | null = null;
 const listeners = new Set<() => void>();
@@ -13,7 +11,8 @@ const listeners = new Set<() => void>();
 const load = (): Budget => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved) as Budget;
+    // Spread over the defaults so budgets saved before a field existed (e.g. `personal`) still load.
+    if (saved) return { ...defaultBudget(), ...(JSON.parse(saved) as Budget) };
   } catch {}
   return defaultBudget();
 };
@@ -62,6 +61,7 @@ const payEntries = (b: Budget, price: number, linkId: string, category: string, 
 
 export const budgetActions = {
   updateSettings: (settings: Partial<Settings>) => update((b) => ({ ...b, settings: { ...b.settings, ...settings } })),
+  updatePersonal: (personal: Partial<Personal>) => update((b) => ({ ...b, personal: { ...b.personal, ...personal } })),
 
   addBill: (bill: Omit<Bill, "id">) => update((b) => ({ ...b, bills: [...b.bills, { ...bill, id: newId() }] })),
   updateBill: (id: string, change: Partial<Bill>) =>

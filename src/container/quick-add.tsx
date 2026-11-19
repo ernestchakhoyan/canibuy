@@ -1,8 +1,10 @@
 "use client";
 
+import { haptic } from "@helper";
 import { BudgetGate } from "@layout";
 import { Button, Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@widget";
 import { ArrowLeftIcon, PiggyBankIcon, PlusIcon, ReceiptIcon, ShoppingBagIcon, WalletIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { ExpenseForm } from "./expense-form";
 import { IncomeForm } from "./income";
@@ -10,15 +12,16 @@ import { OrderForm } from "./orders";
 import { SavingsForm } from "./savings";
 
 const ACTIONS = {
-  expense: { label: "Add expense", hint: "Something you just paid for", icon: ReceiptIcon, Form: ExpenseForm },
-  income: { label: "Add income", hint: "Salary or extra money", icon: WalletIcon, Form: IncomeForm },
-  savings: { label: "Move money", hint: "Into or out of savings", icon: PiggyBankIcon, Form: SavingsForm },
-  order: { label: "Can I afford it?", hint: "Check a purchase", icon: ShoppingBagIcon, Form: OrderForm },
+  expense: { icon: ReceiptIcon, Form: ExpenseForm },
+  income: { icon: WalletIcon, Form: IncomeForm },
+  savings: { icon: PiggyBankIcon, Form: SavingsForm },
+  order: { icon: ShoppingBagIcon, Form: OrderForm },
 };
 type Action = keyof typeof ACTIONS;
 
 /** Center "+" of the bottom bar: a sheet that picks an action, then shows that action's form in place. */
 export function QuickAdd() {
+  const t = useTranslations("quickAdd");
   const [open, setOpen] = useState(false);
   const [action, setAction] = useState<Action | null>(null);
   const current = action && ACTIONS[action];
@@ -32,10 +35,11 @@ export function QuickAdd() {
       }}
     >
       <SheetTrigger
+        onClick={haptic}
         render={
           <Button
             size="icon-lg"
-            aria-label="Quick add"
+            aria-label={t("title")}
             className="size-14 -translate-y-3 rounded-full shadow-lg shadow-primary/30 ring-4 ring-background"
           />
         }
@@ -43,18 +47,21 @@ export function QuickAdd() {
         <PlusIcon className="size-6" />
       </SheetTrigger>
       <SheetContent
+        open={open}
         side="bottom"
         className="mx-auto max-h-[90dvh] max-w-2xl rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
       >
         <SheetHeader className="flex-row items-center gap-2 pr-14">
           {current && (
-            <Button variant="ghost" size="icon-sm" aria-label="Back to quick actions" onClick={() => setAction(null)}>
+            <Button variant="ghost" size="icon-sm" aria-label={t("back")} onClick={() => setAction(null)}>
               <ArrowLeftIcon />
             </Button>
           )}
           <div className="flex flex-col gap-0.5">
-            <SheetTitle className="text-lg font-semibold">{current ? current.label : "Quick add"}</SheetTitle>
-            <SheetDescription>{current ? current.hint : "What do you want to do?"}</SheetDescription>
+            <SheetTitle className="text-lg font-semibold">
+              {action ? t(`actions.${action}.label`) : t("title")}
+            </SheetTitle>
+            <SheetDescription>{action ? t(`actions.${action}.hint`) : t("prompt")}</SheetDescription>
           </div>
         </SheetHeader>
         <div className="overflow-y-auto px-4 pb-4">
@@ -68,7 +75,7 @@ export function QuickAdd() {
           ) : (
             <ul className="grid grid-cols-2 gap-3">
               {(Object.keys(ACTIONS) as Action[]).map((key) => {
-                const { label, hint, icon: Icon } = ACTIONS[key];
+                const { icon: Icon } = ACTIONS[key];
                 return (
                   <li key={key}>
                     <button
@@ -80,8 +87,8 @@ export function QuickAdd() {
                         <Icon className="size-5" aria-hidden="true" />
                       </span>
                       <span className="flex flex-col gap-0.5">
-                        <span className="text-sm font-semibold">{label}</span>
-                        <span className="text-xs text-muted-foreground">{hint}</span>
+                        <span className="text-sm font-semibold">{t(`actions.${key}.label`)}</span>
+                        <span className="text-xs text-muted-foreground">{t(`actions.${key}.hint`)}</span>
                       </span>
                     </button>
                   </li>
