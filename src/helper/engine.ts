@@ -100,7 +100,13 @@ export const savingsBalance = (b: Budget) =>
   sum(ofType(b.entries, "withdrawal")) +
   savingsAccounts(b).total;
 
-export const cushion = (b: Budget) => b.settings.cushionMonths * monthBills(b);
+/**
+ * Safety cushion: `cushionMonths` of the regular bills (rent, utilities…). A project's payment bills aren't in it:
+ * they're a plan you chose, not a cost of living the cushion has to carry you through.
+ */
+export const cushion = (b: Budget) =>
+  b.settings.cushionMonths *
+  b.bills.filter((bill) => bill.active && !bill.projectId).reduce((t, bill) => t + bill.amount, 0);
 
 export const usableSavings = (b: Budget) => Math.max(0, savingsBalance(b) - cushion(b));
 

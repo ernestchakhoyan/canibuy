@@ -7,6 +7,7 @@ import {
   buildSpreadsheet,
   entriesUpdate,
   ordersUpdate,
+  PROJECT_PARTS_TAB,
   parseSheet,
   personalUpdate,
   projectsUpdate,
@@ -91,11 +92,33 @@ export const writeOrders = (accessToken: string, spreadsheetId: string, orders: 
   });
 
 /** Makes the Projects tab's rows exactly `projects` + their `parts`, in one request. */
-export const writeProjects = (accessToken: string, spreadsheetId: string, projects: Project[], parts: ProjectPart[]) =>
-  google(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, accessToken, {
-    method: "POST",
-    body: JSON.stringify(projectsUpdate(projects, parts)),
-  });
+/**
+ * Makes Projects one row per project and Project parts one row per part. Sheets made before the parts tab existed
+ * get it (and their Projects tab is rewritten from the old one-row-per-part layout) in the same request.
+ */
+export const writeProjects = async (
+  accessToken: string,
+  spreadsheetId: string,
+  projects: Project[],
+  parts: ProjectPart[]
+) => {
+  const meta = await sheetMeta(accessToken, spreadsheetId);
+  const projectsId = meta.idOf("Projects");
+  if (projectsId === undefined) throw new Error("The sheet has no Projects tab");
+  let partsId = meta.idOf(PROJECT_PARTS_TAB);
+  const requests: object[] = [];
+  if (partsId === undefined) {
+    partsId = freeSheetId(
+      meta.tabs.map((t) => t.sheetId),
+      SHEET_ID.projectParts
+    );
+    requests.push({
+      addSheet: { properties: { sheetId: partsId, title: PROJECT_PARTS_TAB, gridProperties: { frozenRowCount: 1 } } },
+    });
+  }
+  requests.push(...projectsUpdate(projectsId, partsId, projects, parts));
+  await batchUpdate(accessToken, spreadsheetId, requests);
+};
 
 const batchUpdate = (accessToken: string, spreadsheetId: string, requests: object[]) =>
   google(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, accessToken, {
@@ -219,6 +242,7 @@ export const readSheet = async (accessToken: string, spreadsheetId: string) => {
   const ranges = [
     meta.idOf("Orders") === undefined ? null : `Orders!A:Z`,
     meta.idOf("Projects") === undefined ? null : `Projects!A:Z`,
+    meta.idOf(PROJECT_PARTS_TAB) === undefined ? null : `${quote(PROJECT_PARTS_TAB)}!A:Z`,
     meta.idOf("Bills") === undefined ? "Setup!D:I" : "Bills!A:Z",
     ...months.map((m) => `${quote(m)}!A:H`),
     meta.idOf("Setup") === undefined ? null : "Setup!A:B",
@@ -238,9 +262,10 @@ export const readSheet = async (accessToken: string, spreadsheetId: string) => {
   );
   const byRange = new Map(wanted.map((r, i) => [r, res.valueRanges[i]?.values]));
   return parseSheet({
-    orders: ranges[0] ? byRange.get(ranges[0]) : undefined,
-    projects: ranges[1] ? byRange.get(ranges[1]) : undefined,
-    bills: ranges[2] ? byRange.get(ranges[2]) : undefined,
+    orders: byRange.get("Orders!A:Z"),
+    projects: byRange.get("Projects!A:Z"),
+    projectParts: byRange.get(`${quote(PROJECT_PARTS_TAB)}!A:Z`),
+    bills: byRange.get(meta.idOf("Bills") === undefined ? "Setup!D:I" : "Bills!A:Z"),
     months: months.map((m) => byRange.get(`${quote(m)}!A:H`)),
     settings: byRange.get("Setup!A:B"),
     categories: byRange.get("Setup!K:L"),

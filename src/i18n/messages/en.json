@@ -469,7 +469,7 @@
     "startOver": {
       "title": "Start over",
       "explain": "Deletes everything (orders, projects, bills, savings, entries and past months) from your Google Sheet and this device, and puts the settings back to the start. Appearance and language stay. This can't be undone.",
-      "action": "Hold for 15 seconds to start over",
+      "action": "Hold for 5 seconds to start over",
       "holding": "Keep holding… {seconds, plural, one {# second} other {# seconds}}",
       "working": "Starting over…",
       "failed": "Couldn't empty your Google Sheet, so nothing was deleted. Check your connection and try again."

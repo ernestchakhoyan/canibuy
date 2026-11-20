@@ -21,6 +21,10 @@ export default auth((req) => {
 });
 
 export const config = {
-  // apple-icon: the generated Apple touch icon has no extension, and must load before sign-in.
-  matcher: ["/((?!api|_next|_vercel|apple-icon|.*\\.[a-z0-9]+$).*)"],
+  // Every path but Next's internals and the files the app serves (public/icons, the app icons, the manifest; the
+  // Apple icon has no extension and must load before sign-in). Unknown paths like a stale service worker's
+  // /notifications-sw.js must come through here too: next-intl gives them a real locale, so they 404 normally
+  // instead of reaching /[locale] with "notifications-sw.js" as the locale (an error in the root layout).
+  // ponytail: new files in public/ need their path added here.
+  matcher: ["/((?!api|_next|_vercel|icons/|apple-icon|icon\\.svg|icon-\\d+\\.png|manifest\\.webmanifest).*)"],
 };

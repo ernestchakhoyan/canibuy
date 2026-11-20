@@ -20,7 +20,7 @@ import type {
 // tabs, headers, frozen + warning-protected row 1, named ranges, a hidden month template and the current month.
 // Pure (no "server-only") so `bun run test` can check it outside Next.
 
-export const TEMPLATE_VERSION = 3; // 2: bills got their own tab; 3: Savings tab (savings per currency)
+export const TEMPLATE_VERSION = 4; // 2: Bills tab; 3: Savings tab; 4: Projects one row each + Project parts tab
 export const SPREADSHEET_TITLE = "canibuy";
 
 /** The "Personal" key/value block on the Setup tab, N–O (`buildSpreadsheet` places it, `personalUpdate` rewrites it). */
@@ -40,6 +40,7 @@ export const SHEET_ID = {
   currentMonth: 4,
   bills: 5,
   savings: 6,
+  projectParts: 7,
 } as const;
 
 /** Orders tab header (row 1). `ordersUpdate` writes rows in this column order. */
@@ -57,7 +58,13 @@ export const ORDER_COLUMNS = [
 ];
 
 // Synced tabs: text is always a string value, never parsed (a name like "=IMPORTXML(…)" must not become a formula).
-type CellData = { userEnteredValue?: { stringValue: string } | { numberValue: number } | { boolValue: boolean } };
+type CellData = {
+  userEnteredValue?:
+    | { stringValue: string }
+    | { numberValue: number }
+    | { boolValue: boolean }
+    | { formulaValue: string };
+};
 const text = (v: string): CellData => ({ userEnteredValue: { stringValue: v } });
 const optText = (v: string | undefined): CellData => (v ? text(v) : {});
 const number = (v: number | null): CellData => (v === null ? {} : { userEnteredValue: { numberValue: v } });
@@ -67,11 +74,17 @@ const number = (v: number | null): CellData => (v === null ? {} : { userEnteredV
  * range clears every cell it isn't given, so a removed row disappears in the same request. The header is written
  * too, so sheets made before a column existed get its name.
  */
-const tabUpdate = (sheetId: number, columns: string[], rows: CellData[][], startColumnIndex = 0) => ({
+const tabUpdate = (
+  sheetId: number,
+  columns: string[],
+  rows: CellData[][],
+  startColumnIndex = 0,
+  width = columns.length // wider clears columns an older layout of the tab used
+) => ({
   requests: [
     {
       updateCells: {
-        range: { sheetId, startRowIndex: 0, startColumnIndex, endColumnIndex: startColumnIndex + columns.length },
+        range: { sheetId, startRowIndex: 0, startColumnIndex, endColumnIndex: startColumnIndex + width },
         fields: "userEnteredValue",
         rows: [{ values: columns.map(text) }, ...rows.map((values) => ({ values }))],
       },
@@ -98,36 +111,61 @@ export const ordersUpdate = (orders: Order[]) =>
     ])
   );
 
-/** Projects tab header (row 1): one row per part; the last three columns repeat the project's own fields. */
-export const PROJECT_COLUMNS = [
+/** Projects tab: one row per project. total / paid / left are formulas over its parts (the app ignores them). */
+export const PROJECT_COLUMNS = ["project_id", "project", "started", "archived", "total", "paid", "left"];
+
+/** Project parts tab: one row per part, linked to its project by project_id. */
+export const PROJECT_PARTS_TAB = "Project parts";
+export const PART_COLUMNS = [
   "project_id",
-  "project",
   "part_id",
   "part",
   "cost",
   "pay_month",
   "status",
   "paid_date",
-  "installment", // bank / friend: a loan repayment (they become a bill when the project starts)
-  "project_started",
-  "project_archived",
+  "installment", // bank / friend: a loan repayment; saving: a share of a later part (paid monthly once started)
 ];
 
+/** Width of the old one-tab layout (a row per part, project fields repeated): cleared when rewriting Projects. */
+const LEGACY_PROJECT_WIDTH = 11;
+
 /**
- * Makes the Projects tab exactly header + every part, grouped by project. A project with no parts left (all its
- * payments became a bill) still gets one row, with the part columns empty, so it doesn't vanish from the sheet.
+ * Requests that make Projects one row per project and Project parts one row per part. The Projects totals are
+ * SUMIFS over the parts tab, so the sheet shows each project's money even when edited by hand.
  */
-export const projectsUpdate = (projects: Project[], parts: ProjectPart[]) =>
-  tabUpdate(
-    SHEET_ID.projects,
-    PROJECT_COLUMNS,
-    projects.flatMap((project) => {
-      const own = parts.filter((p) => p.projectId === project.id);
-      const meta = [optText(project.startedDate), optText(project.archivedDate)];
-      if (own.length === 0) return [[text(project.id), text(project.name), {}, {}, {}, {}, {}, {}, {}, ...meta]];
-      return own.map((p) => [
-        text(project.id),
-        text(project.name),
+export const projectsUpdate = (
+  projectsSheetId: number,
+  partsSheetId: number,
+  projects: Project[],
+  parts: ProjectPart[]
+) => {
+  const partsRange = (column: string) => `'${PROJECT_PARTS_TAB}'!${column}:${column}`;
+  const formula = (f: string): CellData => ({ userEnteredValue: { formulaValue: f } });
+  return [
+    ...tabUpdate(
+      projectsSheetId,
+      PROJECT_COLUMNS,
+      projects.map((project, i) => {
+        const row = i + 2;
+        return [
+          text(project.id),
+          text(project.name),
+          optText(project.startedDate),
+          optText(project.archivedDate),
+          formula(`=SUMIFS(${partsRange("D")},${partsRange("A")},A${row})`),
+          formula(`=SUMIFS(${partsRange("D")},${partsRange("A")},A${row},${partsRange("F")},"Paid")`),
+          formula(`=E${row}-F${row}`),
+        ];
+      }),
+      0,
+      LEGACY_PROJECT_WIDTH
+    ).requests,
+    ...tabUpdate(
+      partsSheetId,
+      PART_COLUMNS,
+      parts.map((p) => [
+        text(p.projectId),
         text(p.partId),
         text(p.part),
         number(p.cost),
@@ -135,10 +173,10 @@ export const projectsUpdate = (projects: Project[], parts: ProjectPart[]) =>
         text(p.status),
         optText(p.paidDate),
         optText(p.installment),
-        ...meta,
-      ]);
-    })
-  );
+      ])
+    ).requests,
+  ];
+};
 
 type Value = string | number | boolean | null;
 
@@ -264,12 +302,8 @@ export const buildSpreadsheet = (budget: Budget, month: string) => {
           rows: [ORDER_COLUMNS],
         },
       ]),
-      sheet(SHEET_ID.projects, "Projects", [
-        {
-          column: 0,
-          rows: [PROJECT_COLUMNS],
-        },
-      ]),
+      sheet(SHEET_ID.projects, "Projects", [{ column: 0, rows: [PROJECT_COLUMNS] }]),
+      sheet(SHEET_ID.projectParts, PROJECT_PARTS_TAB, [{ column: 0, rows: [PART_COLUMNS] }]),
       sheet(SHEET_ID.bills, "Bills", [{ column: 0, rows: [BILL_COLUMNS] }]),
       sheet(SHEET_ID.savings, "Savings", [{ column: 0, rows: [SAVING_COLUMNS] }]),
       sheet(SHEET_ID.monthTemplate, "_MonthTemplate", monthTables(""), true),
@@ -449,6 +483,7 @@ export const resetRequests = (tabs: { title: string; sheetId: number }[], month:
   for (const [title, columns] of [
     ["Orders", ORDER_COLUMNS],
     ["Projects", PROJECT_COLUMNS],
+    [PROJECT_PARTS_TAB, PART_COLUMNS],
     ["Bills", BILL_COLUMNS],
     ["Savings", SAVING_COLUMNS],
   ] as const) {
@@ -505,6 +540,7 @@ export const parseSheet = (tables: {
   projects: Table;
   bills: Table;
   months: Table[];
+  projectParts?: Table;
   settings?: Table;
   categories?: Table;
   personal?: Table;
@@ -531,17 +567,22 @@ export const parseSheet = (tables: {
 
   const projects = new Map<string, Project>();
   const parts: ProjectPart[] = [];
+  // Projects: one row per project + a Project parts tab; or (sheets before v4) one row per part with the project's
+  // fields repeated. Both read into the same data.
+  const partRows = tables.projectParts ? records(tables.projectParts) : records(tables.projects);
   for (const r of records(tables.projects)) {
     const projectId = str(r.project_id);
+    if (!projectId || projects.has(projectId)) continue;
+    projects.set(projectId, {
+      id: projectId,
+      name: str(r.project),
+      startedDate: opt(str(r.started ?? r.project_started)),
+      archivedDate: opt(str(r.archived ?? r.project_archived)),
+    });
+  }
+  for (const r of partRows) {
+    const projectId = str(r.project_id);
     if (!projectId) continue;
-    if (!projects.has(projectId)) {
-      projects.set(projectId, {
-        id: projectId,
-        name: str(r.project),
-        startedDate: opt(str(r.project_started)),
-        archivedDate: opt(str(r.project_archived)),
-      });
-    }
     const cost = num(r.cost);
     const status = str(r.status);
     const installment = str(r.installment);

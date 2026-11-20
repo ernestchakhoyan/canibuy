@@ -41,11 +41,20 @@ export function SavingsOverview() {
   const t = useTranslations("savings");
   const locale = useLocale();
   const b = useLoadedBudget();
-  const money = (n: number) => formatMoney(Math.round(n), b.settings.currency, locale);
+  const hidden = b.personal.amountsHidden ?? true; // the eye: shared with This month, Setup and savings accounts
+  const money = (n: number) =>
+    hidden ? maskedMoney(b.settings.currency) : formatMoney(Math.round(n), b.settings.currency, locale);
 
   return (
     <Card>
-      <Stat big label={t("balance")} value={money(savingsBalance(b))} />
+      <div className="flex items-start justify-between gap-2">
+        <Stat big label={t("balance")} value={money(savingsBalance(b))} />
+        <AmountsToggle
+          hidden={hidden}
+          onToggle={() => budgetActions.updatePersonal({ amountsHidden: !hidden })}
+          className="-mt-1 -mr-2"
+        />
+      </div>
       <Separator />
       <div className="grid grid-cols-2 gap-4">
         <Stat
@@ -53,7 +62,8 @@ export function SavingsOverview() {
           value={money(cushion(b))}
           hint={t("cushionHint", { count: b.settings.cushionMonths })}
         />
-        <Stat label={t("available")} value={money(usableSavings(b))} tone="positive" />
+        {/* No green while hidden: the colour alone would hint at the amount. */}
+        <Stat label={t("available")} value={money(usableSavings(b))} tone={hidden ? "default" : "positive"} />
       </div>
     </Card>
   );

@@ -7,10 +7,10 @@ import { RotateCcwIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
-const HOLD_MS = 15_000;
+const HOLD_MS = 5000;
 
 /**
- * Danger zone: wipes the sheet and this device to start from scratch. The gate is a 15-second press-and-hold
+ * Danger zone: wipes the sheet and this device to start from scratch. The gate is a 5-second press-and-hold
  * (pointer, or Space / Enter): letting go or sliding off cancels, so it can't happen by accident.
  */
 export function StartOver() {

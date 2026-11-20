@@ -7,6 +7,7 @@ import {
   affordOptions,
   baseCurrency,
   convertBudget,
+  cushion,
   loanPayment,
   monthBills,
   monthSummary,
@@ -455,12 +456,12 @@ const startedCar = {
 };
 const carSummary = projectSummary(startedCar, { id: "car", name: "Car", startedDate: "2026-11-30" }, today);
 assert.equal(Math.round(carSummary.left), Math.round(700 + 204.35 * 12)); // the parts only, not the bill again
-// Adding the bill doesn't charge the same payments twice: the plan only differs by the bigger safety cushion
-// (1 month of bills here, now including the loan payment), never by the payments themselves.
+// Adding the bill doesn't charge the same payments twice (and a project's bill isn't in the safety cushion).
 assert.deepEqual(
-  projectPlan(startedCar, "car", today).months.map((m) => Math.round(m.balance + 204.35)),
+  projectPlan(startedCar, "car", today).months.map((m) => Math.round(m.balance)),
   projectPlan(started, "car", today).months.map((m) => Math.round(m.balance))
 );
+assert.equal(cushion(startedCar), cushion(started)); // only regular bills (Rent) count
 // Repair: a started loan whose instalments became a bill gets them back, once, with stable ids.
 const lost = { ...startedCar, parts: startedCar.parts.filter((p) => !p.installment) };
 const restored = restoreInstallments(lost).parts.filter((p) => p.installment);
