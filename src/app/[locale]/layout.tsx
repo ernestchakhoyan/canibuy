@@ -34,14 +34,14 @@ export default async function RootLayout({ children }: LayoutProps<"/[locale]">)
     // suppressHydrationWarning: APP_MODE_SCRIPT adds `.dark` / color-scheme before React hydrates.
     <html
       lang={await locale()}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       suppressHydrationWarning
     >
       <head>
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static script built from our own code, no user input */}
         <script dangerouslySetInnerHTML={{ __html: APP_MODE_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-dvh flex-col">
         <NextIntlClientProvider>
           <AppShell quickAdd={<QuickAdd />}>{children}</AppShell>
         </NextIntlClientProvider>

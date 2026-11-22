@@ -159,7 +159,7 @@ export function AppShell({ children, quickAdd }: Props) {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col pb-24">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col pb-24">
         <Suspense fallback={<Header pathname={null} />}>
           <WithPathname>{(pathname) => <Header pathname={pathname} />}</WithPathname>
         </Suspense>
