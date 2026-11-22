@@ -1,6 +1,6 @@
 "use client";
 
-import { cn, formatMoney, orderVerdict, parseAmount, savedToward, todayISO, type Verdict } from "@helper";
+import { cn, formatMoney, orderTiming, orderVerdict, parseAmount, savedToward, todayISO, type Verdict } from "@helper";
 import { budgetActions, useLoadedBudget, useSheetSyncFailed } from "@store";
 import type { Order } from "@type";
 import {
@@ -36,6 +36,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import { type FormEvent, useId, useState } from "react";
 import { AffordOptions } from "./afford-options";
+import { PlanTiming } from "./plan-timing";
 import { ProjectPicker } from "./project-picker";
 
 const verdictText: Record<Verdict, { tone: string; icon: typeof PiggyBankIcon }> = {
@@ -172,6 +173,13 @@ function OrderCard({ order }: { order: Order }) {
               </dd>
             </div>
           </dl>
+          <PlanTiming
+            label={t("card.buyMonth")}
+            value={order.buyMonth ?? null}
+            timing={orderTiming(b, order.id, todayISO())}
+            onChange={(month) => budgetActions.setOrderBuyMonth(order.id, month)}
+            onClear={() => budgetActions.setOrderBuyMonth(order.id, null)}
+          />
           <AffordOptions order={order} />
           {saved > 0 && (
             <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">

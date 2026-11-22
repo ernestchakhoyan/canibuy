@@ -55,6 +55,7 @@ export const ORDER_COLUMNS = [
   "note",
   "loan_rate", // empty = Setup's loan_rate
   "loan_term_months", // empty = Setup's loan_term_months
+  "buy_month", // YYYY-MM planned purchase; empty = no date
 ];
 
 // Synced tabs: text is always a string value, never parsed (a name like "=IMPORTXML(…)" must not become a formula).
@@ -108,6 +109,7 @@ export const ordersUpdate = (orders: Order[]) =>
       text(o.note),
       number(o.loanRate ?? null),
       number(o.loanTermMonths ?? null),
+      optText(o.buyMonth),
     ])
   );
 
@@ -244,12 +246,13 @@ const SUMMARY: Value[][] = [
     "Income",
     '=IF(COUNTIF(C:C,"income_salary")>0, SUMIFS(E:E,C:C,"income_salary"), UsualIncome) + SUMIFS(E:E,C:C,"income_extra")',
   ],
-  // Active bills due this month (K8): empty start / end = no limit.
+  // Active bills due this month (K8): empty start / end = no limit. A project's bills (project_id, column I) only
+  // mirror its payments, which come out of the month when paid from it (bill_paid rows, counted in Expenses).
   [
     "Bills",
-    '=SUMPRODUCT(Bills_amount*(Bills_active=TRUE)*(((Bills_start="")+(Bills_start<=K8))>0)*(((Bills_end="")+(Bills_end>=K8))>0))',
+    `=SUMPRODUCT(Bills_amount*(Bills_active=TRUE)*(((Bills_start="")+(Bills_start<=K8))>0)*(((Bills_end="")+(Bills_end>=K8))>0)*('Bills'!I2:I=""))`,
   ],
-  ["Expenses", '=SUMIFS(E:E,C:C,"expense")'],
+  ["Expenses", '=SUMIFS(E:E,C:C,"expense")+SUMIFS(E:E,C:C,"bill_paid",D:D,"<>Savings")'],
   ["Saved", '=SUMIFS(E:E,C:C,"saving")'],
   ["Taken from savings", '=SUMIFS(E:E,C:C,"withdrawal")'],
   ["Left", "=K2-K3-K4-K5+K6"],
@@ -562,6 +565,7 @@ export const parseSheet = (tables: {
       note: str(r.note),
       loanRate: num(r.loan_rate),
       loanTermMonths: num(r.loan_term_months),
+      ...(MONTH.test(str(r.buy_month)) && { buyMonth: str(r.buy_month) }),
     });
   }
 

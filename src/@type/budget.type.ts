@@ -64,6 +64,8 @@ export type Order = {
   /** Bank terms for this order; `null` (or missing on older orders) = Setup's loan rate / term. */
   loanRate?: number | null;
   loanTermMonths?: number | null;
+  /** YYYY-MM the user plans to buy it; the forecast counts its price then. Missing = no date yet. */
+  buyMonth?: string;
 };
 
 export type ProjectPart = {

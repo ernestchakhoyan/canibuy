@@ -5,6 +5,7 @@ import type { Order, OrderStatus } from "@type";
 
 const STATUSES: OrderStatus[] = ["Planned", "Saving", "Bought", "Dropped"];
 const DATE = /^(\d{4}-\d{2}-\d{2})?$/; // "" when not bought yet
+const MONTH = /^\d{4}-\d{2}$/;
 const MAX_ORDERS = 1000;
 
 const text = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
@@ -24,7 +25,8 @@ const validOrder = (o: Order) =>
   DATE.test(o.boughtDate) &&
   (o.loanRate == null || (Number.isFinite(o.loanRate) && o.loanRate >= 0 && o.loanRate <= 100)) &&
   (o.loanTermMonths == null ||
-    (Number.isInteger(o.loanTermMonths) && o.loanTermMonths >= 1 && o.loanTermMonths <= 600));
+    (Number.isInteger(o.loanTermMonths) && o.loanTermMonths >= 1 && o.loanTermMonths <= 600)) &&
+  (o.buyMonth == null || o.buyMonth === "" || (text(o.buyMonth, 7) && MONTH.test(o.buyMonth)));
 
 /** Mirrors the app's orders into the sheet's Orders tab. No sheet connected → nothing to do. */
 /** Returns `true` once written, `false` when no sheet is connected. */
@@ -39,17 +41,18 @@ export async function saveOrders(orders: Order[]) {
   await writeOrders(
     accessToken,
     spreadsheetId,
-    orders.map(({ id, item, price, deadlineMonths, status, created, boughtDate, note, loanRate, loanTermMonths }) => ({
-      id,
-      item,
-      price,
-      deadlineMonths,
-      status,
-      created,
-      boughtDate,
-      note,
-      loanRate: loanRate ?? null,
-      loanTermMonths: loanTermMonths ?? null,
+    orders.map((o) => ({
+      id: o.id,
+      item: o.item,
+      price: o.price,
+      deadlineMonths: o.deadlineMonths,
+      status: o.status,
+      created: o.created,
+      boughtDate: o.boughtDate,
+      note: o.note,
+      loanRate: o.loanRate ?? null,
+      loanTermMonths: o.loanTermMonths ?? null,
+      buyMonth: o.buyMonth || undefined,
     }))
   );
   return true;

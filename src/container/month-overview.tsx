@@ -13,7 +13,7 @@ import {
   Separator,
   Stat,
 } from "@widget";
-import { SparklesIcon } from "lucide-react";
+import { ChevronRightIcon, HammerIcon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -78,6 +78,25 @@ export function MonthOverview() {
           />
           <Stat label={t("savingsBalance")} value={money(savingsBalance(b))} tone={tone("positive")} />
         </div>
+        {(s.projectsDue > 0 || s.projectsPaid > 0) && (
+          <>
+            <Separator />
+            <Link href="/projects" className="-m-2 flex items-center gap-3 rounded-lg p-2 hover:bg-muted">
+              <HammerIcon className="size-5 shrink-0 text-primary" aria-hidden="true" />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-sm text-muted-foreground">{t("projects.label")}</span>
+                <span className="text-lg font-semibold tabular-nums">
+                  {t("projects.due", { amount: money(s.projectsDue) })}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {s.projectsPaid > 0 && `${t("projects.paid", { amount: money(s.projectsPaid) })} · `}
+                  {t("projects.hint")}
+                </span>
+              </span>
+              <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </Link>
+          </>
+        )}
       </Card>
     </>
   );

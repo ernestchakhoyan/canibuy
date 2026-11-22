@@ -32,6 +32,7 @@ import {
   recordSavingsBills,
   repairProjects,
   replacePlannedParts,
+  rescheduleProject,
   SAVINGS_CATEGORY,
   SHEET_TABS,
   type SheetTab,
@@ -350,6 +351,12 @@ export const budgetActions = {
   /** Bank terms for one order; `null` goes back to Setup's. */
   setOrderLoan: (id: string, terms: Pick<Order, "loanRate" | "loanTermMonths">) =>
     update((b) => ({ ...b, orders: b.orders.map((o) => (o.id === id ? { ...o, ...terms } : o)) })),
+  /** When the order is planned to be bought (YYYY-MM); `null` clears it. */
+  setOrderBuyMonth: (id: string, month: string | null) =>
+    update((b) => ({
+      ...b,
+      orders: b.orders.map((o) => (o.id === id ? { ...o, buyMonth: month ?? undefined } : o)),
+    })),
   removeOrder: (id: string) => update((b) => ({ ...b, orders: b.orders.filter((o) => o.id !== id) })),
   setOrderStatus: (id: string, status: OrderStatus) =>
     update((b) => ({ ...b, orders: b.orders.map((o) => (o.id === id ? { ...o, status } : o)) })),
@@ -453,23 +460,29 @@ export const budgetActions = {
    * Starts a project: records today as its start and replaces its instalments with a recurring bill per lender
    * (see `projectStart`). Nothing is paid; `billName` names the bill in the user's language.
    */
+  /** Moves a project's unpaid parts so the first is due in `month` (see `rescheduleProject`). */
+  rescheduleProject: (projectId: string, month: string) =>
+    update((b) => rescheduleProject(b, projectId, month, todayISO())),
   /** Starts a plan; `parts` (the way picked at Start, see `projectPartsFor`) replace its planned parts first. */
   startProject: (
     projectId: string,
     billName: (lender: Lender, part: string) => string,
-    parts?: ReturnType<typeof projectPartsFor>
+    parts?: ReturnType<typeof projectPartsFor>,
+    /** Month the monthly payments begin (see `projectStart`). */
+    first?: string
   ) =>
     update((b) => {
       const today = todayISO();
       const paid = parts ? replacePlannedParts(b, projectId, parts, newId) : b;
       // Monthly payments (loan instalments, later parts split by month) stay parts to pay one by one; their
-      // recurring bills put them in every month's budget.
+      // recurring bills list them with the other bills.
       return applyProjectStart(
         upsertProject(paid, projectId, { startedDate: today }),
         projectId,
         today,
         billName,
-        newId
+        newId,
+        first
       );
     }),
   /** Draft ↔ planned, before the project starts. Only planned projects hold money in the plans and can start. */

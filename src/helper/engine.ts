@@ -34,6 +34,17 @@ const due = (bill: Bill, month: string) =>
 export const monthBills = (b: Budget, month?: string) =>
   b.bills.filter((bill) => bill.active && (!month || due(bill, month))).reduce((t, bill) => t + bill.amount, 0);
 
+/**
+ * Active bills due in `month` that aren't a project's payments (loan, friend, monthly saving). Project payments are
+ * counted from the project's parts instead: one unpaid part per month, paid from savings or the month's money.
+ */
+export const regularBills = (b: Budget, month: string) =>
+  b.bills.filter((bill) => bill.active && !bill.projectId && due(bill, month)).reduce((t, bill) => t + bill.amount, 0);
+
+/** Instalments of started projects paid as their bill (`payPart`): project money, never in the month's expenses. */
+const projectBillPaid = (entries: Entry[]) =>
+  sum(entries.filter((e) => e.type === "bill_paid" && e.category !== SAVINGS_CATEGORY));
+
 /** Bills that haven't ended by `month`, including ones starting later: the usual monthly commitments from now on. */
 const ongoingBills = (b: Budget, month: string) =>
   b.bills
@@ -184,7 +195,12 @@ export const usualFreeMoney = (b: Budget, today: string) =>
 
 export type MonthSummary = {
   income: number;
+  /** Regular bills due this month (project payments are separate: `projectsDue` / `projectsPaid`). */
   bills: number;
+  /** Started projects' unpaid parts due this month or earlier. They don't touch `left` until paid. */
+  projectsDue: number;
+  /** Project parts paid this month (from savings or the month's money). */
+  projectsPaid: number;
   spent: number;
   saved: number;
   taken: number;
@@ -199,8 +215,17 @@ export const monthSummary = (b: Budget, today: string): MonthSummary => {
   const month = monthOf(today);
   const entries = inMonth(b.entries, month);
   const income = monthIncome(b, month);
-  const bills = monthBills(b, month);
+  const bills = regularBills(b, month);
   const spent = sum(ofType(entries, "expense"));
+  // An instalment paid from this month's money comes out of it; paid from savings, the withdrawal evens it out.
+  const billPaid = projectBillPaid(entries);
+  const partIds = new Set(b.parts.map((p) => p.partId));
+  const projectsPaid = sum(
+    entries.filter((e) => (e.type === "expense" || e.type === "bill_paid") && partIds.has(e.linkId))
+  );
+  const projectsDue = b.parts
+    .filter((p) => p.status === "Planned" && p.payMonth <= month && projectStarted(b, p.projectId))
+    .reduce((t, p) => t + p.cost, 0);
   const saved = sum(ofType(entries, "saving"));
   const taken = sum(ofType(entries, "withdrawal"));
 
@@ -211,16 +236,18 @@ export const monthSummary = (b: Budget, today: string): MonthSummary => {
   const projectedSpend = spent + (everydaySpent / day) * (daysLeft - 1);
 
   // Withdrawals add back what was paid from savings, matching the sheet's "Left" formula.
-  const left = income - bills - spent - saved + taken;
+  const left = income - bills - spent - billPaid - saved + taken;
   return {
     income,
     bills,
+    projectsDue,
+    projectsPaid,
     spent,
     saved,
     taken,
     left,
     projectedSpend,
-    canStillSave: Math.max(0, income - bills - projectedSpend - saved + taken),
+    canStillSave: Math.max(0, income - bills - projectedSpend - billPaid - saved + taken),
     dailyAllowance: left / daysLeft,
     daysLeft,
   };
@@ -573,14 +600,16 @@ export type Lender = NonNullable<ProjectPart["installment"]>;
  * - every planned part due after this month: split into equal monthly payments from this month to its month
  *   (the last one takes the rounding), with its own recurring bill. Each payment is then paid on its own.
  * Bills are due on today's day, capped at 28 so it exists every month. `name(lender, partName)` names a bill.
+ * `first`: the month monthly payments begin (this month by default; next month when starting late in one).
  */
 export const projectStart = (
   b: Budget,
   projectId: string,
   today: string,
-  name: (lender: Lender, part: string) => string
+  name: (lender: Lender, part: string) => string,
+  first = monthOf(today)
 ) => {
-  const month = monthOf(today);
+  const month = first < monthOf(today) ? monthOf(today) : first;
   const dueDay = Math.min(28, Number(today.slice(8, 10)));
   const planned = b.parts.filter((p) => p.projectId === projectId && p.status === "Planned");
   const bill = (lender: Lender, payments: ProjectPart[], label: string) => {
@@ -649,9 +678,10 @@ export const applyProjectStart = (
   projectId: string,
   today: string,
   name: (lender: Lender, part: string) => string,
-  billId: (index: number) => string
+  billId: (index: number) => string,
+  firstMonth?: string
 ): Budget => {
-  const { split, bills } = projectStart(b, projectId, today, name);
+  const { split, bills } = projectStart(b, projectId, today, name, firstMonth);
   const first = new Map(split.map((s) => [s.from, s.payments[0].partId]));
   return {
     ...b,
@@ -746,10 +776,7 @@ export const projectRank = (b: Budget) => {
   return [...live.filter((p) => projectStarted(b, p.id)), ...live.filter((p) => !projectStarted(b, p.id))];
 };
 
-/**
- * Unpaid parts of the projects ranked ahead of `projectId`, by month (overdue ones in `current`). Instalments
- * already in a recurring bill are in every month's bills, so they aren't counted again.
- */
+/** Unpaid parts (instalments included) of the projects ranked ahead of `projectId`, by month (overdue ones now). */
 const aheadPayments = (b: Budget, projectId: string, current: string) => {
   const rank = projectRank(b);
   const i = rank.findIndex((p) => p.id === projectId);
@@ -757,7 +784,6 @@ const aheadPayments = (b: Budget, projectId: string, current: string) => {
   const byMonth = new Map<string, number>();
   for (const p of b.parts) {
     if (!ahead.has(p.projectId) || p.status !== "Planned") continue;
-    if (p.installment && b.bills.some((bill) => bill.projectId === p.projectId && bill.active)) continue;
     const m = p.payMonth < current ? current : p.payMonth;
     byMonth.set(m, (byMonth.get(m) ?? 0) + p.cost);
   }
@@ -772,15 +798,11 @@ export const projectPlan = (b: Budget, projectId: string, today: string) => {
   const payMonth = (m: string) => (m < current ? current : m);
   const last = parts.reduce((max, p) => (payMonth(p.payMonth) > max ? payMonth(p.payMonth) : max), current);
   const avg = averageEveryday(b, today);
-  // A started project's bill is already subtracted from every month; its unpaid instalment parts are paid below,
-  // so add the bill back in those months (the same money, counted once).
-  const billed = b.bills.some((bill) => bill.projectId === projectId && bill.active);
-  const instalmentsIn = (m: string) =>
-    billed ? parts.filter((p) => p.installment && payMonth(p.payMonth) === m).reduce((t, p) => t + p.cost, 0) : 0;
-  // Projects ahead of this one are paid first: their parts come out of the same money.
-  const startMoney = usableSavings(b) + monthSummary(b, today).canStillSave + instalmentsIn(current);
+  // Projects ahead of this one are paid first: their parts come out of the same money. Project bills only mirror
+  // parts, so only regular bills are taken off each month.
+  const startMoney = usableSavings(b) + monthSummary(b, today).canStillSave;
   const startBalance = startMoney - othersIn(current);
-  const incomeIn = (m: string) => monthIncome(b, m) - monthBills(b, m) + instalmentsIn(m) - avg;
+  const incomeIn = (m: string) => monthIncome(b, m) - regularBills(b, m) - avg;
   const freeIn = (m: string) => incomeIn(m) - othersIn(m);
 
   const months: PlanMonth[] = [];
@@ -819,13 +841,15 @@ export const projectPlan = (b: Budget, projectId: string, today: string) => {
 };
 
 /**
- * The budget as if only the projects in `ids` existed, for "what if" forecasts: other projects' parts and their
- * bills (loan, friend, monthly saving) are left out; included drafts count like plans. Bills of no project stay.
+ * The budget as if only the projects and dated orders in `ids` existed, for "what if" forecasts: other projects'
+ * parts and their bills (loan, friend, monthly saving) and other orders' buy months are left out; included drafts
+ * count like plans. Bills of no project stay.
  */
-export const withProjects = (b: Budget, ids: string[]): Budget => {
+export const withPlans = (b: Budget, ids: string[]): Budget => {
   const keep = new Set(ids);
   return {
     ...b,
+    orders: b.orders.map((o) => (o.buyMonth && !keep.has(o.id) ? { ...o, buyMonth: undefined } : o)),
     parts: b.parts.filter((p) => keep.has(p.projectId)),
     bills: b.bills.filter((bill) => !bill.projectId || keep.has(bill.projectId)),
     projects: projectsOf(b).map((p) => (p.draft && keep.has(p.id) ? { ...p, draft: undefined } : p)),
@@ -855,6 +879,9 @@ export type ForecastMonth = {
   projects: number;
   /** The same, per project (largest first). */
   projectItems: { name: string; amount: number }[];
+  /** Open orders planned for that month (overdue ones this month), and each one. */
+  orders: number;
+  orderItems: { name: string; amount: number }[];
 };
 
 /**
@@ -865,29 +892,30 @@ export type ForecastMonth = {
 export const savingsForecast = (b: Budget, today: string, months: number): ForecastMonth[] => {
   const current = monthOf(today);
   const avg = averageEveryday(b, today);
-  // Project payments per project and month: ranked projects' unpaid parts (overdue ones now; instalments already in
-  // a bill are left to the bill), plus every project bill.
+  // Project payments per project and month, from the parts (one per payment, instalments included): unpaid
+  // parts of the ranked projects and of every started one (archived too: its payments still come); overdue ones
+  // now. Project bills only mirror these parts, so they're left out of the bills.
   const ranked = new Set(projectRank(b).map((p) => p.id));
   const names = new Map(projectsOf(b).map((p) => [p.id, p.name]));
-  const billed = (projectId: string) => b.bills.some((bill) => bill.projectId === projectId && bill.active);
-  const projectBill = (bill: Bill, m: string) =>
-    bill.active && Boolean(bill.projectId) && bill.category !== SAVINGS_CATEGORY && due(bill, m);
+  const counts = (projectId: string) => ranked.has(projectId) || projectStarted(b, projectId);
   const projectsIn = (m: string) => {
     const byId = new Map<string, number>();
-    const add = (id: string, amount: number) => byId.set(id, (byId.get(id) ?? 0) + amount);
     for (const p of b.parts) {
-      if (!ranked.has(p.projectId) || p.status !== "Planned" || (p.installment && billed(p.projectId))) continue;
-      if ((p.payMonth < current ? current : p.payMonth) === m) add(p.projectId, p.cost);
+      if (p.status !== "Planned" || !counts(p.projectId)) continue;
+      if ((p.payMonth < current ? current : p.payMonth) === m)
+        byId.set(p.projectId, (byId.get(p.projectId) ?? 0) + p.cost);
     }
-    for (const bill of b.bills) if (projectBill(bill, m)) add(bill.projectId ?? "", bill.amount);
     const items = [...byId]
-      .map(([id, amount]) => ({
-        name: names.get(id) ?? b.bills.find((x) => x.projectId === id)?.project ?? id,
-        amount,
-      }))
+      .map(([id, amount]) => ({ name: names.get(id) ?? id, amount }))
       .sort((a, z) => z.amount - a.amount);
-    const billsOf = b.bills.filter((bill) => projectBill(bill, m)).reduce((t, bill) => t + bill.amount, 0);
-    return { items, total: items.reduce((t, i) => t + i.amount, 0), billsOf };
+    return { items, total: items.reduce((t, i) => t + i.amount, 0) };
+  };
+  const ordersIn = (m: string) => {
+    const items = b.orders
+      .filter((o) => (o.status === "Planned" || o.status === "Saving") && o.buyMonth)
+      .filter((o) => ((o.buyMonth ?? "") < current ? current : o.buyMonth) === m)
+      .map((o) => ({ name: o.item, amount: o.price }));
+    return { orders: items.reduce((t, i) => t + i.amount, 0), orderItems: items };
   };
   const savingsBillsIn = (m: string) =>
     b.bills
@@ -901,15 +929,24 @@ export const savingsForecast = (b: Budget, today: string, months: number): Forec
   const savingExpenses = intoSavings(ofType(entries, "expense"));
   const billsPaidIn = intoSavings(ofType(entries, "bill_paid"));
   const now = projectsIn(current);
+  // Instalments already paid this month as their bill (not in the month's expenses) still count as project money.
+  const paidNow = projectBillPaid(entries);
+  const partProject = new Map(b.parts.map((p) => [p.partId, p.projectId]));
+  const nowItems = new Map(now.items.map((i) => [i.name, i.amount]));
+  for (const e of entries.filter((e) => e.type === "bill_paid" && e.category !== SAVINGS_CATEGORY)) {
+    const name = names.get(partProject.get(e.linkId) ?? "") ?? e.note;
+    nowItems.set(name, (nowItems.get(name) ?? 0) + e.amount);
+  }
   const parts = [
     {
       month: current,
       income: s.income,
-      bills: s.bills - now.billsOf,
+      bills: s.bills,
       toSavings: Math.max(billsPaidIn, savingsBillsIn(current)),
       spending: s.projectedSpend - savingExpenses,
-      projects: now.total,
-      projectItems: now.items,
+      projects: now.total + paidNow,
+      projectItems: [...nowItems].map(([name, amount]) => ({ name, amount })).sort((a, z) => z.amount - a.amount),
+      ...ordersIn(current),
     },
   ];
   for (let m = addMonths(current, 1); parts.length < months; m = addMonths(m, 1)) {
@@ -917,19 +954,123 @@ export const savingsForecast = (b: Budget, today: string, months: number): Forec
     parts.push({
       month: m,
       income: monthIncome(b, m),
-      bills: monthBills(b, m) - p.billsOf,
+      bills: regularBills(b, m),
       toSavings: savingsBillsIn(m),
       spending: avg,
       projects: p.total,
       projectItems: p.items,
+      ...ordersIn(m),
     });
   }
   let balance = savingsBalance(b) - (s.saved - s.taken) - savingExpenses - billsPaidIn;
   return parts.map((p) => {
-    const change = p.income - p.bills + p.toSavings - p.spending - p.projects;
+    const change = p.income - p.bills + p.toSavings - p.spending - p.projects - p.orders;
     balance += change;
     return { ...p, change, balance };
   });
+};
+
+/** How many months from `from` to `to` (negative when `to` is earlier). */
+const monthDiff = (from: string, to: string) =>
+  (Number(to.slice(0, 4)) - Number(from.slice(0, 4))) * 12 + Number(to.slice(5, 7)) - Number(from.slice(5, 7));
+
+/** Months the timing helpers look at: this one + 2 years, the forecast's longest range. */
+export const TIMING_MONTHS = 25;
+
+export type TimingMonth = { month: string; lowest: number; lowestMonth: string };
+export type Timing = {
+  /** Per possible first-payment month: the lowest savings balance from then on, paid that way. */
+  months: TimingMonth[];
+  /** Earliest month that keeps savings above the safety cushion; else above 0 (`tight`); else `null`. */
+  best: string | null;
+  tight: boolean;
+};
+
+/**
+ * When to pay for something: for each month it could start, the lowest savings balance from then on if
+ * `payments` (offsets in months from the start) are added to the `base` forecast. Payments past the forecast's
+ * end are left out (ponytail: 2-year window; a plan running longer is only partly checked).
+ */
+export const timing = (base: ForecastMonth[], payments: { offset: number; amount: number }[], safety: number) => {
+  const months = base.map((start, i) => {
+    let lowest = Number.POSITIVE_INFINITY;
+    let lowestMonth = start.month;
+    let paid = 0;
+    for (let j = i; j < base.length; j++) {
+      paid += payments.filter((p) => i + p.offset === j).reduce((t, p) => t + p.amount, 0);
+      if (base[j].balance - paid < lowest) {
+        lowest = base[j].balance - paid;
+        lowestMonth = base[j].month;
+      }
+    }
+    return { month: start.month, lowest, lowestMonth };
+  });
+  const safe = months.find((m) => m.lowest >= safety);
+  const above = months.find((m) => m.lowest >= 0);
+  return { months, best: (safe ?? above)?.month ?? null, tight: !safe && Boolean(above) } satisfies Timing;
+};
+
+/** When to buy an order: its price in one month, against the forecast without its own buy month. */
+export const orderTiming = (b: Budget, orderId: string, today: string) => {
+  const order = b.orders.find((o) => o.id === orderId);
+  const others = { ...b, orders: b.orders.map((o) => (o.id === orderId ? { ...o, buyMonth: undefined } : o)) };
+  return timing(savingsForecast(others, today, TIMING_MONTHS), [{ offset: 0, amount: order?.price ?? 0 }], cushion(b));
+};
+
+/** A lender's repayments: a bank or friend schedule is fixed once the project starts. */
+const isLoan = (p: ProjectPart) => p.installment === "bank" || p.installment === "friend";
+
+/**
+ * A project's parts that move when its date changes: the unpaid ones, but once started not the loan repayments
+ * (their schedule is fixed; monthly saving payments do move). `from` = the earliest of them (overdue = this month).
+ */
+const movableParts = (b: Budget, projectId: string, today: string) => {
+  const current = monthOf(today);
+  const started = projectStarted(b, projectId);
+  const parts = b.parts.filter((p) => p.projectId === projectId && p.status === "Planned" && !(started && isLoan(p)));
+  const month = (p: ProjectPart) => (p.payMonth < current ? current : p.payMonth);
+  const from = parts.reduce<string | null>((min, p) => (min === null || month(p) < min ? month(p) : min), null);
+  return { parts, from, month };
+};
+
+/** A project's start (or, once started, next payment) month: its earliest movable part's. `null` = none. */
+export const projectFrom = (b: Budget, projectId: string, today: string) => movableParts(b, projectId, today).from;
+
+/** When to start a project: its movable parts, spaced as planned, against the forecast without them. */
+export const projectTiming = (b: Budget, projectId: string, today: string) => {
+  const { parts, from, month } = movableParts(b, projectId, today);
+  const moving = new Set(parts.map((p) => p.partId));
+  const others = { ...b, parts: b.parts.filter((p) => !moving.has(p.partId)) };
+  const payments = parts.map((p) => ({ offset: from ? monthDiff(from, month(p)) : 0, amount: p.cost }));
+  return timing(savingsForecast(others, today, TIMING_MONTHS), payments, cushion(b));
+};
+
+/**
+ * The budget with a project's movable parts shifted so the earliest is due in `month`, gaps kept. Its monthly
+ * saving bills move with them; a loan's bill (same amount and months as that lender's repayments) stays.
+ */
+export const rescheduleProject = (b: Budget, projectId: string, month: string, today: string): Budget => {
+  const { parts, from, month: payMonth } = movableParts(b, projectId, today);
+  if (!from || from === month) return b;
+  const by = monthDiff(from, month);
+  const moving = new Set(parts.map((p) => p.partId));
+  const loans = (["bank", "friend"] as const).map((lender) => {
+    const own = b.parts.filter((p) => p.projectId === projectId && p.installment === lender);
+    const months = own.map((p) => p.payMonth).sort();
+    return { amount: own[0]?.cost, start: months[0], end: months.at(-1) };
+  });
+  const isLoanBill = (bill: Bill) =>
+    loans.some((l) => l.amount === bill.amount && l.start === bill.startMonth && l.end === bill.endMonth);
+  const shift = (m?: string) => (m ? addMonths(m, by) : m);
+  return {
+    ...b,
+    parts: b.parts.map((p) => (moving.has(p.partId) ? { ...p, payMonth: addMonths(payMonth(p), by) } : p)),
+    bills: b.bills.map((bill) =>
+      bill.projectId === projectId && projectStarted(b, projectId) && !isLoanBill(bill)
+        ? { ...bill, startMonth: shift(bill.startMonth), endMonth: shift(bill.endMonth) }
+        : bill
+    ),
+  };
 };
 
 /** The project's unpaid parts due before `month` moved to `month`. */

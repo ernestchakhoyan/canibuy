@@ -110,7 +110,8 @@ assert.deepEqual(body.sheets[0].data[0].rowData[6].values[1], {
 
 // Orders sync: same columns as the template header, rows from row 2, user text never parsed as a formula.
 assert.equal(valueAt(1, 0, 0), "id");
-assert.equal(valueAt(1, 0, ORDER_COLUMNS.length - 1), "loan_term_months");
+assert.equal(valueAt(1, 0, ORDER_COLUMNS.length - 1), "buy_month");
+assert.equal(BILL_COLUMNS.indexOf("project_id"), 8); // month tabs' Bills formula reads it as column I
 const sync = ordersUpdateFn([
   {
     id: "o1",
@@ -259,8 +260,9 @@ assert.deepEqual(entryRequests[2].duplicateSheet, { sourceSheetId: 3, newSheetId
 // Reading back: columns found by header name, broken rows skipped, a part-less project kept.
 const data = parseSheet({
   orders: [
-    ["item", "id", "price", "status", "created", "loan_rate"], // shuffled columns: matched by name
+    ["item", "id", "price", "status", "created", "loan_rate", "buy_month"], // shuffled columns: matched by name
     ["Car", "o1", 35000, "Planned", "2026-11-01", ""],
+    ["TV", "o3", 800, "Planned", "2026-11-01", "", "2027-04"],
     ["Broken", "o2", "lots", "Planned"],
     ["No id", "", 5, "Planned"],
   ],
@@ -277,8 +279,11 @@ const data = parseSheet({
   ],
 });
 assert.deepEqual(
-  data.orders.map((o) => [o.id, o.price, o.loanRate]),
-  [["o1", 35000, null]]
+  data.orders.map((o) => [o.id, o.price, o.loanRate, o.buyMonth]),
+  [
+    ["o1", 35000, null, undefined],
+    ["o3", 800, null, "2027-04"],
+  ]
 );
 assert.deepEqual(
   data.projects.map((p) => [p.id, p.startedDate, p.archivedDate]),

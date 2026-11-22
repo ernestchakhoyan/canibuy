@@ -13,6 +13,7 @@ import {
   type ProjectStatus,
   parseAmount,
   paymentSplit,
+  projectFrom,
   projectFunding,
   projectPlan,
   projectPrice,
@@ -21,6 +22,7 @@ import {
   projectStarted,
   projectSummary,
   projectsOf,
+  projectTiming,
   todayISO,
 } from "@helper";
 import { Link, useRouter } from "@i18n";
@@ -57,6 +59,8 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  ToggleGroup,
+  ToggleGroupItem,
 } from "@widget";
 import {
   ArchiveIcon,
@@ -80,6 +84,7 @@ import {
 import { useParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { type FormEvent, useId, useState } from "react";
+import { PlanTiming } from "./plan-timing";
 import { PayChoiceSheet } from "./project-picker";
 
 const MONTHS_AHEAD = 24;
@@ -385,6 +390,10 @@ function ProjectStart({ projectId, project }: { projectId: string; project: stri
     t("range", { from: monthLabel(from ?? "", locale), to: monthLabel(to ?? "", locale) });
   const billName = (lender: Lender, part: string) => t(`billName.${lender}`, { project: part || project });
   const [choosing, setChoosing] = useState(false);
+  // Monthly payments begin this month, or next month when starting in the second half of this one.
+  const today = todayISO();
+  const current = monthOf(today);
+  const [first, setFirst] = useState(Number(today.slice(8, 10)) > 15 ? addMonths(current, 1) : current);
 
   if (projectStarted(b, projectId)) {
     const bills = b.bills.filter((bill) => bill.projectId === projectId);
@@ -422,12 +431,14 @@ function ProjectStart({ projectId, project }: { projectId: string; project: stri
     );
   }
 
-  const { bills } = projectStart(b, projectId, todayISO(), billName);
+  const { bills } = projectStart(b, projectId, today, billName, first);
   // A plan with no loan yet asks how to pay it first; "Pay now" keeps its parts as planned.
   const price = projectPrice(b, projectId);
+  // The choice only matters when later parts get split into monthly payments (or a way to pay may create some).
+  const splits = price !== null || projectStart(b, projectId, today, billName).split.length > 0;
   const start = () => {
     haptic();
-    if (price === null) budgetActions.startProject(projectId, billName);
+    if (price === null) budgetActions.startProject(projectId, billName, undefined, first);
     else setChoosing(true);
   };
   const action = (
@@ -449,6 +460,26 @@ function ProjectStart({ projectId, project }: { projectId: string; project: stri
             })
           : t("explain")}
       </p>
+      {splits && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span id={`${projectId}-first`} className="text-muted-foreground">
+            {t("first")}
+          </span>
+          <ToggleGroup
+            aria-labelledby={`${projectId}-first`}
+            variant="outline"
+            size="sm"
+            value={[first]}
+            onValueChange={(v) => v[0] && setFirst(v[0])}
+          >
+            {[current, addMonths(current, 1)].map((m) => (
+              <ToggleGroupItem key={m} value={m}>
+                {monthLabel(m, locale)}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+      )}
       <Button onClick={start}>{action}</Button>
       <Button variant="ghost" onClick={() => budgetActions.planProject(projectId, false)}>
         {t("unplan")}
@@ -462,7 +493,7 @@ function ProjectStart({ projectId, project }: { projectId: string; project: stri
           title={t("action")}
           action={action}
           onConfirm={(choice, parts) =>
-            budgetActions.startProject(projectId, billName, choice === "now" ? undefined : parts)
+            budgetActions.startProject(projectId, billName, choice === "now" ? undefined : parts, first)
           }
         />
       )}
@@ -777,6 +808,14 @@ export function ProjectDetails() {
         {summary.total > 0 && <PaymentProgress paid={summary.paid} total={summary.total} progress={summary.progress} />}
         {!started && status !== "archived" && <ProjectPriority projectId={id} />}
         <ProjectStart projectId={id} project={record.name} />
+        {status !== "archived" && status !== "completed" && projectFrom(b, id, today) && (
+          <PlanTiming
+            label={t(started ? "timing.next" : "timing.start")}
+            value={projectFrom(b, id, today)}
+            timing={projectTiming(b, id, today)}
+            onChange={(month) => budgetActions.rescheduleProject(id, month)}
+          />
+        )}
         {plan.total > 0 &&
           (plan.covered ? (
             <p className="flex items-center gap-2 rounded-lg bg-positive/10 px-3 py-2 text-sm font-semibold text-positive">

@@ -155,6 +155,12 @@
     "empty": {
       "title": "No expenses yet",
       "description": "Add one above and it will show up here."
+    },
+    "projects": {
+      "label": "Project payments this month",
+      "due": "{amount} due",
+      "paid": "{amount} paid",
+      "hint": "Not taken from what's left until you pay: from savings or this month's money."
     }
   },
   "expense": {
@@ -216,7 +222,8 @@
       "drop": "Drop",
       "boughtOn": "Bought on {date}",
       "toProject": "Make it a project",
-      "remove": "Remove {item}"
+      "remove": "Remove {item}",
+      "buyMonth": "Buy in"
     },
     "empty": {
       "title": "No orders yet",
@@ -370,7 +377,8 @@
       "explainLoan": "It's a plan for now. Starting it turns the monthly payments into a recurring bill ({bills}); then you can pay its other parts.",
       "explainDraft": "It's a draft: an idea that doesn't hold any money yet. Plan it to add it to your priorities and the savings forecast.",
       "plan": "Move to planned",
-      "unplan": "Back to draft"
+      "unplan": "Back to draft",
+      "first": "First monthly payment"
     },
     "pay": {
       "action": "Pay",
@@ -457,17 +465,21 @@
       "ahead": "Pays {count, plural, one {# project} other {# projects}} ahead of it first.",
       "up": "Move up",
       "down": "Move down"
+    },
+    "timing": {
+      "start": "Starts in",
+      "next": "Next payment in"
     }
   },
   "outlook": {
     "filter": {
-      "title": "Projects to include",
-      "description": "Turn projects on or off to see how they change your savings, with your recurring bills.",
+      "title": "Plans to include",
+      "description": "Turn projects and dated orders on or off to see how they change your savings, with your recurring bills.",
       "all": "All",
       "none": "None",
       "empty": "No projects yet.",
       "create": "Create one",
-      "summary": "{count, plural, =0 {No projects counted: just your bills and usual spending.} one {# project counted, {amount} still to pay.} other {# projects counted, {amount} still to pay.}}"
+      "summary": "{count, plural, =0 {Nothing counted: just your bills and usual spending.} one {# plan counted, {amount} still to pay.} other {# plans counted, {amount} still to pay.}}"
     },
     "toProjects": "Manage projects"
   },
@@ -621,9 +633,22 @@
       "shortHint": "Income doesn't cover this month: {amount} comes out of your savings, leaving {balance}.",
       "leftHint": "Everything is paid from income; the rest goes into savings ({balance} after).",
       "runsOut": "That's more than you have.",
-      "belowCushion": "Below your safety cushion ({amount})."
+      "belowCushion": "Below your safety cushion ({amount}).",
+      "orders": "Orders"
     },
     "baseline": "Without projects",
     "baselineLegend": "Without projects: {amount}"
+  },
+  "timing": {
+    "thisMonth": "this month",
+    "inMonths": "{count, plural, one {in # month} other {in # months}}",
+    "notSet": "No date yet",
+    "safe": "Savings stay above your safety cushion (lowest {amount} in {month}).",
+    "belowCushion": "Savings dip below your safety cushion: {amount} in {month}.",
+    "runsOut": "Savings would run out: {amount} in {month}.",
+    "suggest": "Best time: {month} ({ahead}). Your savings stay above the safety cushion.",
+    "suggestTight": "Earliest without running out: {month} ({ahead}), though savings dip below the cushion.",
+    "never": "Within 2 years this would take your savings below zero in any month.",
+    "use": "Use"
   }
 }

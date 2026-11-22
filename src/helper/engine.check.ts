@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import type { Budget } from "@type";
 import { periodRange } from "./date";
 import { defaultBudget } from "./default-budget";
+import type { ForecastMonth } from "./engine";
 import {
   affordOptions,
+  applyProjectStart,
   averageEveryday,
   baseCurrency,
   convertBudget,
@@ -13,9 +15,11 @@ import {
   loanPayment,
   monthBills,
   monthSummary,
+  orderTiming,
   orderVerdict,
   payChoices,
   paymentSplit,
+  projectFrom,
   projectFunding,
   projectPartsFor,
   projectPlan,
@@ -25,17 +29,20 @@ import {
   projectStarted,
   projectSummary,
   projectsOf,
+  projectTiming,
   recordSavingsBills,
   repairProjects,
   replacePlannedParts,
+  rescheduleProject,
   restoreInstallments,
   savingsAccounts,
   savingsBalance,
   savingsForecast,
   splitStartedProjects,
+  timing,
   toBase,
   usableSavings,
-  withProjects,
+  withPlans,
   withSavingsCategory,
 } from "./engine";
 import { parseAmount } from "./money";
@@ -585,14 +592,14 @@ assert.deepEqual(
   projectRank(draftB).map((p) => p.id),
   ["A"]
 );
-const onlyB = withProjects(draftB, ["B"]);
+const onlyB = withPlans(draftB, ["B"]);
 assert.ok(onlyB.parts.every((p) => p.projectId === "B"));
 assert.deepEqual(
   projectRank(onlyB).map((p) => p.id),
   ["A", "B"]
 ); // A has no parts left, so it changes nothing
-assert.equal(withProjects({ ...draftB, bills: [{ ...draftB.bills[0], projectId: "A" }] }, []).bills.length, 0);
-assert.ok(savingsForecast(withProjects(draftB, []), today, 3).every((f) => f.projects === 0));
+assert.equal(withPlans({ ...draftB, bills: [{ ...draftB.bills[0], projectId: "A" }] }, []).bills.length, 0);
+assert.ok(savingsForecast(withPlans(draftB, []), today, 3).every((f) => f.projects === 0));
 // Start asks how to pay: a plan's price is its planned parts, until it has loan payments or starts.
 assert.equal(projectPrice(two, "A"), 3000);
 assert.equal(projectPrice(bankA, "A"), null);
@@ -660,7 +667,7 @@ assert.deepEqual(
   forecast.map((f) => f.month),
   ["2026-11", "2026-12", "2027-01"]
 );
-for (const f of forecast) assert.equal(f.change, f.income - f.bills + f.toSavings - f.spending - f.projects);
+for (const f of forecast) assert.equal(f.change, f.income - f.bills + f.toSavings - f.spending - f.projects - f.orders);
 // November: 150 spent (50 of it into savings) + 200 more at the daily pace; 550 left covers it.
 assert.deepEqual(
   [forecast[0].income, forecast[0].bills, forecast[0].toSavings, forecast[0].spending],
@@ -711,13 +718,165 @@ const kitchenBill = {
   project: "Kitchen",
   category: "Other",
 };
-const [withLoan0] = savingsForecast({ ...budget, bills: [...budget.bills, kitchenBill] }, today, 1);
+// Project money comes from the parts: the bill only mirrors them, so it's neither a bill nor counted twice.
+const kitchenPart = {
+  projectId: "k",
+  project: "Kitchen",
+  partId: "kp1",
+  part: "Loan 1/2",
+  cost: 150,
+  payMonth: "2026-11",
+  status: "Planned" as const,
+  paidDate: "",
+  installment: "bank" as const,
+};
+const loaned = {
+  ...budget,
+  bills: [...budget.bills, kitchenBill],
+  parts: [kitchenPart],
+  projects: [{ id: "k", name: "Kitchen", startedDate: "2026-11-01" }],
+};
+const [withLoan0] = savingsForecast(loaned, today, 1);
 const [noLoan0] = savingsForecast(budget, today, 1);
 assert.equal(withLoan0.bills, noLoan0.bills);
 assert.deepEqual(withLoan0.projectItems, [{ name: "Kitchen", amount: 150 }]);
 assert.equal(withLoan0.change, noLoan0.change - 150);
+// This month: the unpaid instalment is due but leaves "left" alone; paid from savings it still doesn't touch it,
+// paid from this month's money it does.
+const sLoan = monthSummary(loaned, today);
+assert.equal(sLoan.left, monthSummary(budget, today).left);
+assert.equal(sLoan.projectsDue, 150);
+const paidEntry = {
+  id: "pe",
+  date: today,
+  type: "bill_paid" as const,
+  category: "Home",
+  amount: 150,
+  note: "",
+  linkId: "kp1",
+  createdAt: "",
+};
+const paidParts = [{ ...kitchenPart, status: "Paid" as const }];
+const fromMonth = { ...loaned, parts: paidParts, entries: [...loaned.entries, paidEntry] };
+assert.equal(monthSummary(fromMonth, today).left, sLoan.left - 150);
+assert.equal(monthSummary(fromMonth, today).projectsPaid, 150);
+assert.equal(monthSummary(fromMonth, today).projectsDue, 0);
+const fromSavingsB = {
+  ...fromMonth,
+  entries: [...fromMonth.entries, { ...paidEntry, id: "pw", type: "withdrawal" as const }],
+};
+assert.equal(monthSummary(fromSavingsB, today).left, sLoan.left);
+// The forecast counts it once either way.
+assert.equal(savingsForecast(fromMonth, today, 1)[0].balance, withLoan0.balance);
 assert.ok(defaultBudget().categories.some((c) => c.name === "Savings"));
 assert.equal(withSavingsCategory(budget).categories.at(-1)?.name, "Savings");
 assert.equal(withSavingsCategory(defaultBudget()).categories.filter((c) => c.name === "Savings").length, 1);
+
+// Timing: for each start month, the lowest savings from then on; best = earliest above the cushion, else above 0.
+const flat = ["2026-11", "2026-12", "2027-01", "2027-02"].map((month, i) => ({ month, balance: 1000 + 500 * i }));
+const buyTv = timing(flat as ForecastMonth[], [{ offset: 0, amount: 1500 }], 500);
+assert.deepEqual(
+  buyTv.months.map((m) => m.lowest),
+  [-500, 0, 500, 1000]
+);
+assert.equal(buyTv.best, "2027-01");
+assert.equal(buyTv.tight, false);
+const split = timing(
+  flat as ForecastMonth[],
+  [
+    { offset: 0, amount: 600 },
+    { offset: 1, amount: 600 },
+  ],
+  0
+);
+assert.deepEqual(
+  split.months.map((m) => m.lowest),
+  [300, 800, 1300, 1900]
+); // from Nov: Dec 1500 − 1200 is the low; from Feb the 2nd payment falls past the window
+assert.equal(timing(flat as ForecastMonth[], [{ offset: 0, amount: 9999 }], 0).best, null);
+// A dated order counts in the forecast in its month, and its timing ignores its own date.
+const tvOrder = {
+  id: "tv",
+  item: "TV",
+  price: 400,
+  deadlineMonths: null,
+  status: "Planned" as const,
+  created: today,
+  boughtDate: "",
+  note: "",
+  buyMonth: "2026-12",
+};
+const withTv = { ...budget, orders: [tvOrder] };
+const [, decTv] = savingsForecast(withTv, today, 2);
+assert.deepEqual(decTv.orderItems, [{ name: "TV", amount: 400 }]);
+assert.equal(decTv.change, savingsForecast(budget, today, 2)[1].change - 400);
+assert.deepEqual(
+  orderTiming(withTv, "tv", today).months,
+  orderTiming({ ...withTv, orders: [{ ...tvOrder, buyMonth: undefined }] }, "tv", today).months
+);
+// Rescheduling a plan moves its unpaid parts together; once started, billed instalments keep their months.
+assert.equal(projectFrom(two, "A", today), "2026-12");
+const laterA = rescheduleProject(two, "A", "2027-03", today);
+assert.equal(laterA.parts.find((p) => p.partId === "a1")?.payMonth, "2027-03");
+assert.equal(projectTiming(two, "A", today).months.length, 25);
+const startedBank = {
+  ...bankA,
+  projects: [{ id: "A", name: "A", startedDate: today }],
+  bills: [...bankA.bills, { ...bankA.bills[0], id: "lb", projectId: "A" }],
+};
+const movedBank = rescheduleProject(startedBank, "A", "2027-02", today);
+assert.equal(movedBank.parts.find((p) => p.partId === "a1")?.payMonth, "2027-02");
+assert.ok(
+  movedBank.parts
+    .filter((p) => p.installment)
+    .every((p, i) => p.payMonth === startedBank.parts.filter((x) => x.installment)[i].payMonth)
+);
+
+// Start late in a month: monthly payments can begin next month instead.
+const kit = {
+  ...budget,
+  projects: [{ id: "k", name: "Kitchen" }],
+  parts: [
+    {
+      projectId: "k",
+      project: "Kitchen",
+      partId: "k1",
+      part: "Tiles",
+      cost: 900,
+      payMonth: "2027-01",
+      status: "Planned" as const,
+      paidDate: "",
+    },
+  ],
+};
+const name = (_: string, part: string) => part;
+assert.deepEqual(
+  projectStart(kit, "k", today, name).split[0].payments.map((p) => p.payMonth),
+  ["2026-11", "2026-12", "2027-01"]
+);
+const nextStart = projectStart(kit, "k", today, name, "2026-12");
+assert.deepEqual(
+  nextStart.split[0].payments.map((p) => [p.payMonth, p.cost]),
+  [
+    ["2026-12", 450],
+    ["2027-01", 450],
+  ]
+);
+assert.equal(nextStart.bills[0].startMonth, "2026-12");
+// A started project's monthly saving payments move with its date (and their bill); a loan's don't.
+const kitStarted = applyProjectStart(
+  { ...kit, projects: [{ id: "k", name: "Kitchen", startedDate: today }] },
+  "k",
+  today,
+  name,
+  (i) => `kb${i}`
+);
+assert.equal(projectFrom(kitStarted, "k", today), "2026-11");
+const kitMoved = rescheduleProject(kitStarted, "k", "2027-02", today);
+assert.deepEqual(
+  kitMoved.parts.map((p) => p.payMonth),
+  ["2027-02", "2027-03", "2027-04"]
+);
+assert.deepEqual([kitMoved.bills.at(-1)?.startMonth, kitMoved.bills.at(-1)?.endMonth], ["2027-02", "2027-04"]);
 
 console.log("engine: all checks passed");

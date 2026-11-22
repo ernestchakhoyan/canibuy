@@ -331,24 +331,27 @@ function Breakdown({
             <dd className="tabular-nums">{signed(r.value)}</dd>
           </div>
         ))}
-      {Math.round(f.projects) !== 0 && (
-        <>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">{t("projects")}</dt>
-            <dd className="tabular-nums">{signed(-f.projects)}</dd>
-          </div>
-          {f.projectItems.length > 1 &&
-            f.projectItems.map((p) => (
+      {(
+        [
+          { key: "projects", total: f.projects, items: f.projectItems },
+          { key: "orders", total: f.orders, items: f.orderItems },
+        ] as const
+      )
+        .filter((g) => Math.round(g.total) !== 0)
+        .map((g) => (
+          <Fragment key={g.key}>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">{t(g.key)}</dt>
+              <dd className="tabular-nums">{signed(-g.total)}</dd>
+            </div>
+            {g.items.map((p) => (
               <div key={p.name} className="flex justify-between gap-4 pl-3 text-xs">
                 <dt className="text-muted-foreground">· {p.name}</dt>
-                <dd className="text-muted-foreground tabular-nums">{signed(-p.amount)}</dd>
+                {g.items.length > 1 && <dd className="text-muted-foreground tabular-nums">{signed(-p.amount)}</dd>}
               </div>
             ))}
-          {f.projectItems.length === 1 && (
-            <div className="-mt-1 pl-3 text-xs text-muted-foreground">· {f.projectItems[0].name}</div>
-          )}
-        </>
-      )}
+          </Fragment>
+        ))}
       <div
         className={cn(
           "mt-1 flex justify-between gap-4 border-t pt-1 font-medium",
