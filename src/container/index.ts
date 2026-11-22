@@ -2,6 +2,7 @@ export * from "./auth";
 export * from "./expense-form";
 export * from "./history";
 export * from "./income";
+export * from "./install-prompt";
 export * from "./month-expenses";
 export * from "./month-overview";
 export * from "./orders";

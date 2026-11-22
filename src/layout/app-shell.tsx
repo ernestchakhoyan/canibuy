@@ -152,6 +152,11 @@ export function AppShell({ children, quickAdd }: Props) {
     return () => query.removeEventListener("change", follow);
   }, [appMode]);
 
+  // Service worker (public/sw.js): makes the app installable, shows an offline page.
+  useEffect(() => {
+    navigator.serviceWorker?.register("/sw.js").catch(() => {});
+  }, []);
+
   return (
     <MotionConfig reducedMotion="user">
       <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col pb-24">

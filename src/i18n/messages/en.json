@@ -680,5 +680,16 @@
     "suggestTight": "Earliest without running out: {month} ({ahead}), though savings dip below the cushion.",
     "never": "Within 2 years this would take your savings below zero in any month.",
     "use": "Use"
+  },
+  "install": {
+    "title": "Install canibuy",
+    "text": "Open it from your home screen like an app: full screen, one tap away.",
+    "action": "Install",
+    "dismiss": "Hide",
+    "ios": {
+      "before": "Tap",
+      "share": "Share",
+      "after": "in Safari, then “Add to Home Screen”."
+    }
   }
 }

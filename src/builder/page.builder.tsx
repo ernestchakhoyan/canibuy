@@ -7,6 +7,7 @@ import {
   History,
   IncomeForm,
   IncomeList,
+  InstallPrompt,
   MonthExpenses,
   MonthOverview,
   OrderForm,
@@ -75,6 +76,7 @@ const Page = ({ title, children }: { title: PageKey; children: ReactNode }) => (
 
 export const MonthBuilder = () => (
   <Page title="month">
+    <InstallPrompt />
     <MonthOverview />
     <SavingsForecast />
     <MonthExpenses />
