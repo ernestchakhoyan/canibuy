@@ -97,6 +97,8 @@ export type Rates = { base: CurrencyCode; date: string; perBase: Partial<Record<
 export type Project = {
   id: string;
   name: string;
+  /** An idea, not planned yet: holds no money in the plans and can't start. Missing = planned (older rows too). */
+  draft?: boolean;
   /** YYYY-MM-DD the user pressed Start; missing = still a plan. */
   startedDate?: string;
   /** YYYY-MM-DD the user archived it; missing = not archived. */

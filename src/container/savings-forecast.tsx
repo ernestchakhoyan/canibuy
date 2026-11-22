@@ -11,6 +11,7 @@ import {
   todayISO,
 } from "@helper";
 import { useLoadedBudget } from "@store";
+import type { Budget } from "@type";
 import {
   Button,
   Card,
@@ -41,16 +42,27 @@ import { Area, AreaChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from "rec
 const RANGES = [12, 24] as const;
 type Range = (typeof RANGES)[number];
 
-const config = { balance: { label: "balance", color: "var(--primary)" } } satisfies ChartConfig;
+const config = {
+  balance: { label: "balance", color: "var(--primary)" },
+  baseline: { label: "baseline", color: "var(--muted-foreground)" },
+} satisfies ChartConfig;
+
+type Props = {
+  /** The budget to forecast; the loaded one when missing. */
+  budget?: Budget;
+  /** A second budget drawn as a dashed line to compare with (e.g. the same budget without projects). */
+  baseline?: Budget;
+};
 
 /**
  * Savings balance month by month for the next 1 or 2 years, with recurring bills as they start and end. Pick a
  * month (the select, a tap on the chart or a table row) to see its balance and how much it changes that month.
  */
-export function SavingsForecast() {
+export function SavingsForecast({ budget, baseline }: Props = {}) {
   const t = useTranslations("forecast");
   const locale = useLocale();
-  const b = useLoadedBudget();
+  const loaded = useLoadedBudget();
+  const b = budget ?? loaded;
   const selectId = useId();
   const [range, setRange] = useState<Range>(12);
   /** Months ahead of this one; `null` = the end of the range. */
@@ -69,7 +81,8 @@ export function SavingsForecast() {
   const ahead = (i: number) => (i === 0 ? t("thisMonth") : t("inMonths", { count: i }));
 
   // This month + `range` months ahead.
-  const data = savingsForecast(b, todayISO(), range + 1);
+  const base = baseline && savingsForecast(baseline, todayISO(), range + 1);
+  const data = savingsForecast(b, todayISO(), range + 1).map((f, i) => ({ ...f, baseline: base?.[i]?.balance }));
   const index = Math.min(picked ?? range, range);
   const selected = data[index];
   const safety = cushion(b);
@@ -184,21 +197,39 @@ export function SavingsForecast() {
               <ChartTooltipContent
                 indicator="line"
                 labelFormatter={(_, payload) => monthLabel(String(payload[0]?.payload.month ?? ""), locale)}
-                formatter={(value, _name, item) => (
-                  <span className="flex w-full flex-col gap-0.5">
-                    <span className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">{t("balance")}</span>
-                      <span className="font-medium tabular-nums">{money(Number(value))}</span>
+                formatter={(value, name, item) =>
+                  name === "baseline" ? (
+                    <span className="flex w-full justify-between gap-4">
+                      <span className="text-muted-foreground">{t("baseline")}</span>
+                      <span className="tabular-nums">{money(Number(value))}</span>
                     </span>
-                    <span className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">{t("monthChange")}</span>
-                      <span className="font-medium tabular-nums">{signed(Number(item.payload.change))}</span>
+                  ) : (
+                    <span className="flex w-full flex-col gap-0.5">
+                      <span className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">{t("balance")}</span>
+                        <span className="font-medium tabular-nums">{money(Number(value))}</span>
+                      </span>
+                      <span className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">{t("monthChange")}</span>
+                        <span className="font-medium tabular-nums">{signed(Number(item.payload.change))}</span>
+                      </span>
                     </span>
-                  </span>
-                )}
+                  )
+                }
               />
             }
           />
+          {base && (
+            <Area
+              dataKey="baseline"
+              type="monotone"
+              stroke="var(--color-baseline)"
+              strokeWidth={1.5}
+              strokeDasharray="5 4"
+              fill="none"
+              activeDot={false}
+            />
+          )}
           <Area
             dataKey="balance"
             type="monotone"
@@ -213,6 +244,12 @@ export function SavingsForecast() {
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
           <span aria-hidden="true" className="w-4 border-t border-dashed border-muted-foreground" />
           {t("cushion", { amount: money(safety) })}
+        </p>
+      )}
+      {base && (
+        <p className="-mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+          <span aria-hidden="true" className="w-4 border-t-2 border-dashed border-muted-foreground" />
+          {t("baselineLegend", { amount: money(base[index].balance) })}
         </p>
       )}
       <Collapsible>
@@ -247,7 +284,7 @@ export function SavingsForecast() {
                   {i === index && (
                     <TableRow className="hover:bg-transparent">
                       <TableCell colSpan={3} className="whitespace-normal">
-                        <Breakdown month={f} signed={signed} />
+                        <Breakdown month={f} signed={signed} money={money} safety={safety} />
                       </TableCell>
                     </TableRow>
                   )}
@@ -261,16 +298,29 @@ export function SavingsForecast() {
   );
 }
 
-/** How a month's change adds up: each part with its sign, zero parts left out, the change last. */
-function Breakdown({ month: f, signed }: { month: ForecastMonth; signed: (n: number) => string }) {
+/**
+ * How a month's change adds up: each part with its sign (zero parts left out, project payments per project), then
+ * where the money comes from: what's left goes into savings, or what income doesn't cover is taken from them.
+ */
+function Breakdown({
+  month: f,
+  signed,
+  money,
+  safety,
+}: {
+  month: ForecastMonth;
+  signed: (n: number) => string;
+  money: (n: number) => string;
+  safety: number;
+}) {
   const t = useTranslations("forecast.breakdown");
   const rows = [
     { key: "income", value: f.income },
     { key: "bills", value: -f.bills },
     { key: "toSavings", value: f.toSavings },
     { key: "spending", value: -f.spending },
-    { key: "projects", value: -f.projects },
   ] as const;
+  const short = f.change < 0;
   return (
     <dl className="flex flex-col gap-1 py-1 text-sm">
       {rows
@@ -281,10 +331,43 @@ function Breakdown({ month: f, signed }: { month: ForecastMonth; signed: (n: num
             <dd className="tabular-nums">{signed(r.value)}</dd>
           </div>
         ))}
-      <div className="flex justify-between gap-4 border-t pt-1 font-medium">
-        <dt>{t("total")}</dt>
+      {Math.round(f.projects) !== 0 && (
+        <>
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">{t("projects")}</dt>
+            <dd className="tabular-nums">{signed(-f.projects)}</dd>
+          </div>
+          {f.projectItems.length > 1 &&
+            f.projectItems.map((p) => (
+              <div key={p.name} className="flex justify-between gap-4 pl-3 text-xs">
+                <dt className="text-muted-foreground">· {p.name}</dt>
+                <dd className="text-muted-foreground tabular-nums">{signed(-p.amount)}</dd>
+              </div>
+            ))}
+          {f.projectItems.length === 1 && (
+            <div className="-mt-1 pl-3 text-xs text-muted-foreground">· {f.projectItems[0].name}</div>
+          )}
+        </>
+      )}
+      <div
+        className={cn(
+          "mt-1 flex justify-between gap-4 border-t pt-1 font-medium",
+          short ? "text-negative" : "text-positive"
+        )}
+      >
+        <dt>{t(short ? "fromSavings" : "intoSavings")}</dt>
         <dd className="tabular-nums">{signed(f.change)}</dd>
       </div>
+      <p className="text-xs text-muted-foreground">
+        {short
+          ? t("shortHint", { amount: money(-f.change), balance: money(f.balance) })
+          : t("leftHint", { balance: money(f.balance) })}
+        {f.balance < 0
+          ? ` ${t("runsOut")}`
+          : f.balance < safety
+            ? ` ${t("belowCushion", { amount: money(safety) })}`
+            : ""}
+      </p>
     </dl>
   );
 }

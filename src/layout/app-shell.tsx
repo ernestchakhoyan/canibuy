@@ -11,6 +11,7 @@ import {
   PiggyBankIcon,
   SettingsIcon,
   ShoppingBagIcon,
+  TelescopeIcon,
   WalletIcon,
 } from "lucide-react";
 import { MotionConfig } from "motion/react";
@@ -31,6 +32,7 @@ const TABS = [
 
 /** Header icons: pages visited less often. */
 const HEADER_LINKS = [
+  { href: "/outlook", label: "outlook", icon: TelescopeIcon },
   { href: "/income", label: "income", icon: WalletIcon },
   { href: "/history", label: "history", icon: HistoryIcon },
   { href: "/setup", label: "setup", icon: SettingsIcon },

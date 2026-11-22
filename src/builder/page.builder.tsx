@@ -11,6 +11,7 @@ import {
   MonthOverview,
   OrderForm,
   OrderList,
+  Outlook,
   PersonalForm,
   ProjectDetails,
   ProjectList,
@@ -58,7 +59,7 @@ const ProjectSkeleton = () => (
   </>
 );
 
-type PageKey = "month" | "income" | "savings" | "orders" | "projects" | "history" | "setup";
+type PageKey = "month" | "income" | "savings" | "orders" | "projects" | "outlook" | "history" | "setup";
 
 /** Page heading, translated from the `pages` namespace (same keys as the tab titles in each page.tsx). */
 const Title = async ({ page }: { page: PageKey }) => (
@@ -120,6 +121,15 @@ export const ProjectBuilder = () => (
       </Suspense>
     </BudgetGate>
   </Screen>
+);
+
+/** /outlook: reads `?with=` (useSearchParams suspends while prerendering), hence the Suspense boundary. */
+export const OutlookBuilder = () => (
+  <Page title="outlook">
+    <Suspense fallback={<Skeleton className="h-64 w-full motion-reduce:animate-none" />}>
+      <Outlook />
+    </Suspense>
+  </Page>
 );
 
 export const HistoryBuilder = () => (

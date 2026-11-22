@@ -28,37 +28,57 @@ import {
 } from "@widget";
 import { HammerIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 
-type Props = { order: Order; open: boolean; onOpenChange: (open: boolean) => void };
+type SheetProps = {
+  item: string;
+  price: number;
+  /** An order's own deadline and bank terms; Setup's when missing. */
+  terms?: Pick<Order, "deadlineMonths" | "loanRate" | "loanTermMonths">;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  action: ReactNode;
+  /** Pre-selected way, when it applies; else the first save-then-borrow row that fits; else the first way. */
+  suggested?: PayChoice;
+  onConfirm: (choice: PayChoice, parts: ReturnType<typeof projectPartsFor>) => void;
+};
 
-/** "Make it a project": pick how the order is paid; the project gets the matching payments as parts. */
-export function ProjectPicker({ order, open, onOpenChange }: Props) {
+/** "How will you pay for {item}?": every way that applies to `price`, each with the payments it makes. */
+export function PayChoiceSheet({
+  item,
+  price,
+  terms,
+  open,
+  onOpenChange,
+  title,
+  action,
+  suggested,
+  onConfirm,
+}: SheetProps) {
   const t = useTranslations("orders.toProject");
   const ta = useTranslations("orders.afford");
   const locale = useLocale();
   const id = useId();
-  const router = useRouter();
   const b = useLoadedBudget();
   const money = (n: number) => formatMoney(Math.round(n), b.settings.currency, locale);
   const months = (count: number) => ta("months", { count });
   const today = todayISO();
-  const o = affordOptions(b, order, today);
+  const o = affordOptions(b, { deadlineMonths: null, ...terms, price }, today);
   const choices = payChoices(o);
-
-  // Start on the way the verdict suggests; else the first save-then-borrow row that fits; else the first way.
-  const { verdict } = orderVerdict(b, order, today);
-  const suggested: PayChoice | undefined =
-    (verdict === "pay_now" && "now") ||
-    (verdict === "save_up" && "save") ||
-    (verdict === "loan" && "bank") ||
-    o.combos.filter((c) => c.fits).map((c) => `combo-${c.wait}` as const)[0];
+  const fallback = o.combos.filter((c) => c.fits).map((c) => `combo-${c.wait}` as const)[0];
   const [choice, setChoice] = useState<PayChoice | undefined>(undefined);
-  const selected = choice ?? (suggested && choices.includes(suggested) ? suggested : choices[0]);
+  const selected =
+    choice ??
+    (suggested && choices.includes(suggested)
+      ? suggested
+      : fallback && choices.includes(fallback)
+        ? fallback
+        : choices[0]);
 
   const partsFor = (c: PayChoice) =>
-    projectPartsFor(o, order.price, c, today, {
-      purchase: order.item,
+    projectPartsFor(o, price, c, today, {
+      purchase: item,
       fromSavings: t("parts.fromSavings"),
       loan: (i, n) => t("parts.loan", { i, n }),
       friend: (i, n) => t("parts.friend", { i, n }),
@@ -82,30 +102,30 @@ export function ProjectPicker({ order, open, onOpenChange }: Props) {
               : t("combo.label", { months: months(combo?.wait ?? 0) });
     const detail =
       c === "now"
-        ? t("now.detail", { price: money(order.price) })
+        ? t("now.detail", { price: money(price) })
         : c === "save"
           ? t("save.detail", {
-              price: money(order.price),
+              price: money(price),
               month: monthLabel(o.save.readyMonth ?? "", locale),
               months: months(o.save.months),
             })
           : c === "bank"
             ? t("bank.detail", {
                 ...financed,
-                down: money(order.price - o.borrow),
-                hasDown: order.price - o.borrow > 0 ? "yes" : "no",
+                down: money(price - o.borrow),
+                hasDown: price - o.borrow > 0 ? "yes" : "no",
                 payment: money(bank?.payment ?? 0),
               })
             : c === "friend"
               ? t("friend.detail", {
                   ...financed,
-                  down: money(order.price - o.borrow),
-                  hasDown: order.price - o.borrow > 0 ? "yes" : "no",
+                  down: money(price - o.borrow),
+                  hasDown: price - o.borrow > 0 ? "yes" : "no",
                   payment: money(o.friend.perMonth),
                 })
               : t("combo.detail", {
                   ...financed,
-                  down: money(order.price - (combo?.borrow ?? 0)),
+                  down: money(price - (combo?.borrow ?? 0)),
                   month: monthLabel(combo?.buyMonth ?? "", locale),
                   payment: money(combo?.payment ?? 0),
                 });
@@ -113,12 +133,11 @@ export function ProjectPicker({ order, open, onOpenChange }: Props) {
     return { label, detail, total, fits };
   };
 
-  const create = () => {
+  const confirm = () => {
     if (!selected) return;
     haptic();
-    const projectId = budgetActions.orderToProject(order.id, partsFor(selected));
+    onConfirm(selected, partsFor(selected));
     onOpenChange(false);
-    router.push(`/projects/${projectId}`);
   };
 
   return (
@@ -129,14 +148,14 @@ export function ProjectPicker({ order, open, onOpenChange }: Props) {
         className="mx-auto max-h-[90dvh] max-w-2xl rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
       >
         <SheetHeader className="pr-14">
-          <SheetTitle className="text-lg font-semibold">{t("title")}</SheetTitle>
-          <SheetDescription>{t("description", { item: order.item })}</SheetDescription>
+          <SheetTitle className="text-lg font-semibold">{title}</SheetTitle>
+          <SheetDescription>{t("description", { item })}</SheetDescription>
         </SheetHeader>
         <div className="overflow-y-auto px-4">
           <RadioGroup
             value={selected}
             onValueChange={(v) => setChoice(v as PayChoice)}
-            aria-label={t("description", { item: order.item })}
+            aria-label={t("description", { item })}
             className="gap-2"
           >
             {choices.map((c) => {
@@ -167,12 +186,44 @@ export function ProjectPicker({ order, open, onOpenChange }: Props) {
           </RadioGroup>
         </div>
         <SheetFooter>
-          <Button onClick={create} disabled={!selected}>
-            <HammerIcon data-icon="inline-start" />
-            {t("create")}
+          <Button onClick={confirm} disabled={!selected}>
+            {action}
           </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  );
+}
+
+type Props = { order: Order; open: boolean; onOpenChange: (open: boolean) => void };
+
+/** "Make it a project": pick how the order is paid; the project gets the matching payments as parts. */
+export function ProjectPicker({ order, open, onOpenChange }: Props) {
+  const t = useTranslations("orders.toProject");
+  const router = useRouter();
+  const b = useLoadedBudget();
+  const { verdict } = orderVerdict(b, order, todayISO());
+  const suggested: PayChoice | undefined =
+    (verdict === "pay_now" && "now") ||
+    (verdict === "save_up" && "save") ||
+    (verdict === "loan" && "bank") ||
+    undefined;
+  return (
+    <PayChoiceSheet
+      item={order.item}
+      price={order.price}
+      terms={order}
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("title")}
+      suggested={suggested}
+      action={
+        <>
+          <HammerIcon data-icon="inline-start" />
+          {t("create")}
+        </>
+      }
+      onConfirm={(_, parts) => router.push(`/projects/${budgetActions.orderToProject(order.id, parts)}`)}
+    />
   );
 }

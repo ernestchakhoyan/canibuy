@@ -8,6 +8,7 @@
     "savings": "Savings",
     "orders": "Orders",
     "projects": "Projects",
+    "outlook": "Outlook",
     "history": "History",
     "setup": "Setup",
     "connect": "Connect your Google Sheet",
@@ -18,6 +19,7 @@
     "orders": "Orders",
     "savings": "Savings",
     "projects": "Projects",
+    "outlook": "Outlook",
     "income": "Income",
     "history": "History",
     "setup": "Setup",
@@ -348,13 +350,6 @@
       "remove": "Remove {name}",
       "edit": "Edit {name}"
     },
-    "table": {
-      "caption": "Month by month",
-      "month": "Month",
-      "in": "In",
-      "paid": "Paid",
-      "balance": "Balance"
-    },
     "empty": {
       "title": "No projects yet",
       "description": "Plan multi-month spending, like a renovation, above."
@@ -372,7 +367,10 @@
       },
       "startedOn": "Started on {date}.",
       "explain": "It's a plan for now. Start it when you begin; then you can pay its parts.",
-      "explainLoan": "It's a plan for now. Starting it turns the monthly payments into a recurring bill ({bills}); then you can pay its other parts."
+      "explainLoan": "It's a plan for now. Starting it turns the monthly payments into a recurring bill ({bills}); then you can pay its other parts.",
+      "explainDraft": "It's a draft: an idea that doesn't hold any money yet. Plan it to add it to your priorities and the savings forecast.",
+      "plan": "Move to planned",
+      "unplan": "Back to draft"
     },
     "pay": {
       "action": "Pay",
@@ -387,13 +385,15 @@
     },
     "tabs": {
       "all": "All",
-      "inactive": "Inactive",
+      "draft": "Drafts",
+      "planned": "Planned",
       "active": "Active",
       "completed": "Completed",
       "archived": "Archived"
     },
     "status": {
-      "inactive": "Inactive",
+      "draft": "Draft",
+      "planned": "Planned",
       "active": "Active",
       "completed": "Completed",
       "archived": "Archived"
@@ -405,13 +405,14 @@
     },
     "list": {
       "create": "Create project",
-      "createHint": "It starts as a plan; start it when you begin.",
+      "createHint": "It starts as a draft; plan it, then start it when you begin.",
       "left": "{amount} left",
       "next": "Next: {amount} in {month}",
       "bill": "{amount}/mo bill until {month}",
       "empty": {
         "all": "No projects yet.",
-        "inactive": "No plans waiting to start.",
+        "draft": "No drafts.",
+        "planned": "No plans waiting to start.",
         "active": "Nothing in progress.",
         "completed": "Nothing finished yet.",
         "archived": "Nothing archived."
@@ -420,13 +421,15 @@
     "details": {
       "back": "All projects",
       "notFound": "This project doesn't exist anymore.",
-      "parts": "Parts"
+      "parts": "Parts",
+      "outlook": "See it in Outlook"
     },
     "actions": {
       "archive": "Archive",
       "restore": "Restore",
       "delete": "Delete",
       "deleteConfirm": "Delete this project and its parts? This can't be undone.",
+      "deleteConfirmStarted": "Delete this project, its parts and its monthly bills? Payments you already made stay in your history. This can't be undone.",
       "deleteYes": "Delete",
       "cancel": "Cancel"
     },
@@ -455,6 +458,18 @@
       "up": "Move up",
       "down": "Move down"
     }
+  },
+  "outlook": {
+    "filter": {
+      "title": "Projects to include",
+      "description": "Turn projects on or off to see how they change your savings, with your recurring bills.",
+      "all": "All",
+      "none": "None",
+      "empty": "No projects yet.",
+      "create": "Create one",
+      "summary": "{count, plural, =0 {No projects counted: just your bills and usual spending.} one {# project counted, {amount} still to pay.} other {# projects counted, {amount} still to pay.}}"
+    },
+    "toProjects": "Manage projects"
   },
   "setup": {
     "save": "Save",
@@ -601,7 +616,14 @@
       "toSavings": "Savings bills (back into savings)",
       "spending": "Everyday spending",
       "projects": "Project payments",
-      "total": "Change that month"
-    }
+      "fromSavings": "Taken from savings",
+      "intoSavings": "Goes into savings",
+      "shortHint": "Income doesn't cover this month: {amount} comes out of your savings, leaving {balance}.",
+      "leftHint": "Everything is paid from income; the rest goes into savings ({balance} after).",
+      "runsOut": "That's more than you have.",
+      "belowCushion": "Below your safety cushion ({amount})."
+    },
+    "baseline": "Without projects",
+    "baselineLegend": "Without projects: {amount}"
   }
 }

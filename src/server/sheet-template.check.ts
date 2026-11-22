@@ -135,7 +135,7 @@ assert.equal(ordersUpdateFn([]).requests[0].updateCells.rows.length, 1); // head
 
 // Projects sync: Projects = one row per project (totals are formulas over the parts tab), Project parts = one row per
 // part. Names never become formulas; the Projects rewrite also clears the old wider one-row-per-part layout.
-assert.equal(valueAt(2, 0, PROJECT_COLUMNS.length - 1), "left"); // template header = sync header
+assert.equal(valueAt(2, 0, PROJECT_COLUMNS.length - 1), "draft"); // template header = sync header
 assert.equal(valueAt(PARTS, 0, PART_COLUMNS.length - 1), "installment");
 const [projectsReq, partsReq] = projectsUpdate(
   2,
@@ -268,6 +268,7 @@ const data = parseSheet({
     PROJECT_COLUMNS,
     ["p1", "Kitchen", "2026-11-19", "", 1000, 1000, 0],
     ["p2", "Car", "2026-11-19", "2026-12-01", 0, 0, 0],
+    ["p3", "Boat", "", "", 0, 0, 0, true],
   ],
   projectParts: [PART_COLUMNS, ["p1", "a", "Tiles", 1000, "2026-11", "Paid", "2026-11-19", ""]],
   bills: [BILL_COLUMNS, ["l", "Car · loan", "2,963.5", 19, "Other", true, "2026-12", "2027-11", "p2", "Car"]],
@@ -284,7 +285,12 @@ assert.deepEqual(
   [
     ["p1", "2026-11-19", undefined],
     ["p2", "2026-11-19", "2026-12-01"],
+    ["p3", undefined, undefined],
   ]
+);
+assert.deepEqual(
+  data.projects.map((p) => p.draft),
+  [undefined, undefined, true]
 );
 assert.deepEqual(
   data.parts.map((p) => [p.partId, p.projectId, p.cost]),

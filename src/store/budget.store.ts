@@ -26,10 +26,12 @@ import {
   newId,
   type PaySource,
   paymentSplit,
+  type projectPartsFor,
   projectStarted,
   projectsOf,
   recordSavingsBills,
   repairProjects,
+  replacePlannedParts,
   SAVINGS_CATEGORY,
   SHEET_TABS,
   type SheetTab,
@@ -384,7 +386,7 @@ export const budgetActions = {
         orders: b.orders.filter((o) => o.id !== id),
         entries: b.entries.map((e) => (e.linkId === id ? { ...e, linkId: added[0].partId } : e)),
         parts: [...b.parts, ...added],
-        projects: [...projectsOf(b), { id: projectId, name: order.item }],
+        projects: [...projectsOf(b), { id: projectId, name: order.item, draft: true }],
       };
     });
     return projectId;
@@ -399,7 +401,7 @@ export const budgetActions = {
         ...b.parts,
         ...parts.map((p) => ({ ...p, projectId, project, partId: newId(), status: "Planned" as const, paidDate: "" })),
       ],
-      projects: [...projectsOf(b), { id: projectId, name: project }],
+      projects: [...projectsOf(b), { id: projectId, name: project, draft: true }],
     }));
     return projectId;
   },
@@ -437,7 +439,7 @@ export const budgetActions = {
   moveProject: (projectId: string, by: -1 | 1) =>
     update((b) => {
       const all = projectsOf(b);
-      const plan = (p: Project) => !p.archivedDate && !projectStarted(b, p.id);
+      const plan = (p: Project) => !p.archivedDate && !p.draft && !projectStarted(b, p.id);
       const from = all.findIndex((p) => p.id === projectId);
       let to = from + by;
       while (to >= 0 && to < all.length && !plan(all[to])) to += by;
@@ -451,27 +453,46 @@ export const budgetActions = {
    * Starts a project: records today as its start and replaces its instalments with a recurring bill per lender
    * (see `projectStart`). Nothing is paid; `billName` names the bill in the user's language.
    */
-  startProject: (projectId: string, billName: (lender: Lender, part: string) => string) =>
+  /** Starts a plan; `parts` (the way picked at Start, see `projectPartsFor`) replace its planned parts first. */
+  startProject: (
+    projectId: string,
+    billName: (lender: Lender, part: string) => string,
+    parts?: ReturnType<typeof projectPartsFor>
+  ) =>
     update((b) => {
       const today = todayISO();
+      const paid = parts ? replacePlannedParts(b, projectId, parts, newId) : b;
       // Monthly payments (loan instalments, later parts split by month) stay parts to pay one by one; their
       // recurring bills put them in every month's budget.
-      return applyProjectStart(upsertProject(b, projectId, { startedDate: today }), projectId, today, billName, newId);
+      return applyProjectStart(
+        upsertProject(paid, projectId, { startedDate: today }),
+        projectId,
+        today,
+        billName,
+        newId
+      );
     }),
+  /** Draft ↔ planned, before the project starts. Only planned projects hold money in the plans and can start. */
+  planProject: (projectId: string, planned: boolean) =>
+    update((b) =>
+      projectStarted(b, projectId) ? b : upsertProject(b, projectId, { draft: planned ? undefined : true })
+    ),
   /** Archives (hides from the active tabs) or restores a project; nothing about its money changes. */
   archiveProject: (projectId: string, archived: boolean) =>
     update((b) => upsertProject(b, projectId, { archivedDate: archived ? todayISO() : undefined })),
-  /** Deletes a project that hasn't started (a started one has payments and a bill tied to it: archive it instead). */
+  /** Deletes a project that hasn't started, or an archived one (a started one must be archived first). */
   deleteProject: (projectId: string) =>
-    update((b) =>
-      projectStarted(b, projectId)
-        ? b
-        : {
-            ...b,
-            parts: b.parts.filter((p) => p.projectId !== projectId),
-            projects: projectsOf(b).filter((p) => p.id !== projectId),
-          }
-    ),
+    update((b) => {
+      const archived = projectsOf(b).some((p) => p.id === projectId && p.archivedDate);
+      if (projectStarted(b, projectId) && !archived) return b;
+      // Payments already made stay as entries in their months; only the plan, its parts and bills go.
+      return {
+        ...b,
+        parts: b.parts.filter((p) => p.projectId !== projectId),
+        projects: projectsOf(b).filter((p) => p.id !== projectId),
+        bills: b.bills.filter((bill) => bill.projectId !== projectId),
+      };
+    }),
 
   /** Pays a part, its money coming from `source` (see `paymentSplit`). */
   payPart: (partId: string, source: PaySource) =>

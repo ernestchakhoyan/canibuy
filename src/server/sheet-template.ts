@@ -112,7 +112,7 @@ export const ordersUpdate = (orders: Order[]) =>
   );
 
 /** Projects tab: one row per project. total / paid / left are formulas over its parts (the app ignores them). */
-export const PROJECT_COLUMNS = ["project_id", "project", "started", "archived", "total", "paid", "left"];
+export const PROJECT_COLUMNS = ["project_id", "project", "started", "archived", "total", "paid", "left", "draft"];
 
 /** Project parts tab: one row per part, linked to its project by project_id. */
 export const PROJECT_PARTS_TAB = "Project parts";
@@ -156,6 +156,7 @@ export const projectsUpdate = (
           formula(`=SUMIFS(${partsRange("D")},${partsRange("A")},A${row})`),
           formula(`=SUMIFS(${partsRange("D")},${partsRange("A")},A${row},${partsRange("F")},"Paid")`),
           formula(`=E${row}-F${row}`),
+          project.draft ? { userEnteredValue: { boolValue: true } } : {},
         ];
       }),
       0,
@@ -577,6 +578,7 @@ export const parseSheet = (tables: {
       name: str(r.project),
       startedDate: opt(str(r.started ?? r.project_started)),
       archivedDate: opt(str(r.archived ?? r.project_archived)),
+      ...(bool(r.draft) && { draft: true }),
     });
   }
   for (const r of partRows) {

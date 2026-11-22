@@ -15,6 +15,7 @@ import {
   paymentSplit,
   projectFunding,
   projectPlan,
+  projectPrice,
   projectRank,
   projectStart,
   projectStarted,
@@ -52,13 +53,6 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Tabs,
   TabsContent,
   TabsList,
@@ -70,6 +64,7 @@ import {
   ArrowDownIcon,
   ArrowLeftIcon,
   ArrowUpIcon,
+  CalendarCheckIcon,
   CheckCircle2Icon,
   ChevronRightIcon,
   HammerIcon,
@@ -78,12 +73,14 @@ import {
   PlayIcon,
   PlusIcon,
   ReceiptIcon,
+  TelescopeIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { type FormEvent, useId, useState } from "react";
+import { PayChoiceSheet } from "./project-picker";
 
 const MONTHS_AHEAD = 24;
 const monthOptions = () => {
@@ -376,7 +373,7 @@ function ProjectPriority({ projectId }: { projectId: string }) {
 }
 
 /**
- * Every project starts as a plan; Start marks it started (then its parts can be paid) and turns loan / friend
+ * Every project starts as a draft; "Plan it" makes it a plan (it then holds money and can start); Start marks it started (then its parts can be paid) and turns loan / friend
  * instalments into a recurring bill. Once started, shows when, and that bill.
  */
 function ProjectStart({ projectId, project }: { projectId: string; project: string }) {
@@ -387,6 +384,7 @@ function ProjectStart({ projectId, project }: { projectId: string; project: stri
   const range = (from?: string, to?: string) =>
     t("range", { from: monthLabel(from ?? "", locale), to: monthLabel(to ?? "", locale) });
   const billName = (lender: Lender, part: string) => t(`billName.${lender}`, { project: part || project });
+  const [choosing, setChoosing] = useState(false);
 
   if (projectStarted(b, projectId)) {
     const bills = b.bills.filter((bill) => bill.projectId === projectId);
@@ -406,7 +404,38 @@ function ProjectStart({ projectId, project }: { projectId: string; project: stri
     );
   }
 
+  if (projectsOf(b).find((p) => p.id === projectId)?.draft) {
+    return (
+      <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3 text-sm">
+        <p className="text-muted-foreground">{t("explainDraft")}</p>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            haptic();
+            budgetActions.planProject(projectId, true);
+          }}
+        >
+          <CalendarCheckIcon data-icon="inline-start" />
+          {t("plan")}
+        </Button>
+      </div>
+    );
+  }
+
   const { bills } = projectStart(b, projectId, todayISO(), billName);
+  // A plan with no loan yet asks how to pay it first; "Pay now" keeps its parts as planned.
+  const price = projectPrice(b, projectId);
+  const start = () => {
+    haptic();
+    if (price === null) budgetActions.startProject(projectId, billName);
+    else setChoosing(true);
+  };
+  const action = (
+    <>
+      <PlayIcon data-icon="inline-start" />
+      {t("action")}
+    </>
+  );
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3 text-sm">
       <p className="text-muted-foreground">
@@ -420,15 +449,23 @@ function ProjectStart({ projectId, project }: { projectId: string; project: stri
             })
           : t("explain")}
       </p>
-      <Button
-        onClick={() => {
-          haptic();
-          budgetActions.startProject(projectId, billName);
-        }}
-      >
-        <PlayIcon data-icon="inline-start" />
-        {t("action")}
+      <Button onClick={start}>{action}</Button>
+      <Button variant="ghost" onClick={() => budgetActions.planProject(projectId, false)}>
+        {t("unplan")}
       </Button>
+      {price !== null && (
+        <PayChoiceSheet
+          item={project}
+          price={price}
+          open={choosing}
+          onOpenChange={setChoosing}
+          title={t("action")}
+          action={action}
+          onConfirm={(choice, parts) =>
+            budgetActions.startProject(projectId, billName, choice === "now" ? undefined : parts)
+          }
+        />
+      )}
     </div>
   );
 }
@@ -490,7 +527,8 @@ function PayPart({ part }: { part: ProjectPart }) {
 }
 
 const STATUS_BADGE: Record<ProjectStatus, "default" | "secondary" | "outline"> = {
-  inactive: "outline",
+  draft: "outline",
+  planned: "outline",
   active: "default",
   completed: "secondary",
   archived: "outline",
@@ -558,7 +596,7 @@ function ProjectSummaryCard({ summary }: { summary: ReturnType<typeof projectSum
   );
 }
 
-const TABS = ["all", "inactive", "active", "completed", "archived"] as const;
+const TABS = ["all", "draft", "planned", "active", "completed", "archived"] as const;
 
 /** Projects page: a Create button next to the tabs, and the projects as cards per status. */
 export function ProjectList() {
@@ -646,7 +684,7 @@ export function ProjectList() {
   );
 }
 
-/** Archive / restore, and delete (only before it starts: a started project has payments and a bill tied to it). */
+/** Archive / restore, and delete: before it starts, or once archived (then its bills go too, payments made stay). */
 function ProjectActions({ projectId, archived, started }: { projectId: string; archived: boolean; started: boolean }) {
   const t = useTranslations("projects.actions");
   const router = useRouter();
@@ -655,7 +693,7 @@ function ProjectActions({ projectId, archived, started }: { projectId: string; a
   if (confirming) {
     return (
       <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 p-3 text-sm">
-        <p>{t("deleteConfirm")}</p>
+        <p>{t(started ? "deleteConfirmStarted" : "deleteConfirm")}</p>
         <div className="grid grid-cols-2 gap-2">
           <Button
             variant="destructive"
@@ -679,7 +717,7 @@ function ProjectActions({ projectId, archived, started }: { projectId: string; a
         {archived ? <ArchiveRestoreIcon data-icon="inline-start" /> : <ArchiveIcon data-icon="inline-start" />}
         {archived ? t("restore") : t("archive")}
       </Button>
-      {!started && (
+      {(!started || archived) && (
         <Button variant="ghost" className="text-destructive" onClick={() => setConfirming(true)}>
           <Trash2Icon data-icon="inline-start" />
           {t("delete")}
@@ -824,32 +862,15 @@ export function ProjectDetails() {
         <AddPartForm projectId={id} />
       </Card>
 
-      {plan.total > 0 && (
-        <Card>
-          <Table className="tabular-nums">
-            <TableCaption className="caption-top text-left text-xs">{t("table.caption")}</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("table.month")}</TableHead>
-                <TableHead className="text-right">{t("table.in")}</TableHead>
-                <TableHead className="text-right">{t("table.paid")}</TableHead>
-                <TableHead className="text-right">{t("table.balance")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {plan.months.map((m) => (
-                <TableRow key={m.month}>
-                  <TableCell>{m.month}</TableCell>
-                  <TableCell className="text-right">{money(m.added)}</TableCell>
-                  <TableCell className="text-right">{m.paid ? money(m.paid) : ""}</TableCell>
-                  <TableCell className={cn("text-right", m.balance < 0 && "text-negative")}>
-                    {money(m.balance)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+      {plan.total > 0 && status !== "archived" && status !== "completed" && (
+        <Link
+          href={`/outlook?with=${id}`}
+          className="flex min-h-11 items-center gap-3 rounded-xl border bg-card px-4 py-2 text-sm hover:bg-muted"
+        >
+          <TelescopeIcon className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="flex-1">{t("details.outlook")}</span>
+          <ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+        </Link>
       )}
 
       <ProjectActions projectId={id} archived={status === "archived"} started={started} />

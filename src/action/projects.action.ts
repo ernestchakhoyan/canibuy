@@ -12,7 +12,11 @@ const optionalDate = (v: unknown) =>
   v === undefined || v === null || v === "" || (text(v, 10) && DATE.test(v as string));
 
 const validProject = (p: Project) =>
-  text(p.id, 32) && text(p.name, 200) && optionalDate(p.startedDate) && optionalDate(p.archivedDate);
+  text(p.id, 32) &&
+  text(p.name, 200) &&
+  optionalDate(p.startedDate) &&
+  optionalDate(p.archivedDate) &&
+  (p.draft === undefined || typeof p.draft === "boolean");
 
 const validPart = (p: ProjectPart) =>
   text(p.projectId, 32) &&
@@ -50,7 +54,7 @@ export async function saveProjects(projects: Project[], parts: ProjectPart[]) {
   await writeProjects(
     accessToken,
     spreadsheetId,
-    projects.map(({ id, name, startedDate, archivedDate }) => ({ id, name, startedDate, archivedDate })),
+    projects.map(({ id, name, startedDate, archivedDate, draft }) => ({ id, name, startedDate, archivedDate, draft })),
     parts.map(({ projectId, project, partId, part, cost, payMonth, status, paidDate, installment }) => ({
       projectId,
       project,

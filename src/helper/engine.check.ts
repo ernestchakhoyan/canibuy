@@ -19,6 +19,7 @@ import {
   projectFunding,
   projectPartsFor,
   projectPlan,
+  projectPrice,
   projectRank,
   projectStart,
   projectStarted,
@@ -26,6 +27,7 @@ import {
   projectsOf,
   recordSavingsBills,
   repairProjects,
+  replacePlannedParts,
   restoreInstallments,
   savingsAccounts,
   savingsBalance,
@@ -33,6 +35,7 @@ import {
   splitStartedProjects,
   toBase,
   usableSavings,
+  withProjects,
   withSavingsCategory,
 } from "./engine";
 import { parseAmount } from "./money";
@@ -242,7 +245,14 @@ const status = (b: typeof budget) => {
   const record = projectsOf(b).find((p) => p.id === "k");
   return record && projectSummary(b, record, today).status;
 };
-assert.equal(status(kitchen), "inactive");
+assert.equal(status(kitchen), "planned"); // older data without the draft flag: planned
+const kitchenDraft = { ...kitchen, projects: [{ id: "k", name: "Kitchen", draft: true }] };
+assert.equal(status(kitchenDraft), "draft");
+assert.deepEqual(projectRank(kitchenDraft), []); // a draft holds no money in the plans
+assert.equal(
+  status({ ...kitchenDraft, projects: [{ id: "k", name: "Kitchen", draft: true, archivedDate: today }] }),
+  "archived"
+);
 const kitchenStarted = { ...kitchen, projects: [{ id: "k", name: "Kitchen", startedDate: "2026-11-01" }] };
 assert.equal(status(kitchenStarted), "active");
 const kitchenPaid = { ...kitchenStarted, parts: proj([{ cost: 300, payMonth: "2026-11", status: "Paid" }]) };
@@ -518,6 +528,11 @@ assert.equal(projectPlan({ ...two, parts: [two.parts[1]] }, "B", today).covered,
 const planB = projectPlan(two, "B", today);
 assert.equal(planB.covered, false); // A's 3000 is paid first
 assert.equal(planB.ahead, 1);
+// A's 3000 shows as "projects ahead" in Dec, apart from what comes in; the balance is the same either way.
+const decB = planB.months.find((m) => m.month === "2026-12");
+assert.equal(decB?.others, 3000);
+assert.equal(decB?.paid, 600);
+assert.equal(decB?.balance, planB.months[0].balance + (decB?.added ?? 0) - 3000 - 600);
 assert.equal(projectPlan(two, "A", today).ahead, 0); // B is behind: not counted
 // A started → ranked first even when listed after B.
 assert.deepEqual(
@@ -558,6 +573,40 @@ assert.deepEqual(
 );
 assert.equal(projectFunding(bankA, "A", today), null); // already financed
 assert.equal(fundProject(bankA, "A", "friend", today, String, String), bankA);
+// Outlook: only the picked projects count; others' parts and bills drop out, a picked draft counts like a plan.
+const draftB = {
+  ...bankA,
+  projects: [
+    { id: "A", name: "A" },
+    { id: "B", name: "B", draft: true },
+  ],
+};
+assert.deepEqual(
+  projectRank(draftB).map((p) => p.id),
+  ["A"]
+);
+const onlyB = withProjects(draftB, ["B"]);
+assert.ok(onlyB.parts.every((p) => p.projectId === "B"));
+assert.deepEqual(
+  projectRank(onlyB).map((p) => p.id),
+  ["A", "B"]
+); // A has no parts left, so it changes nothing
+assert.equal(withProjects({ ...draftB, bills: [{ ...draftB.bills[0], projectId: "A" }] }, []).bills.length, 0);
+assert.ok(savingsForecast(withProjects(draftB, []), today, 3).every((f) => f.projects === 0));
+// Start asks how to pay: a plan's price is its planned parts, until it has loan payments or starts.
+assert.equal(projectPrice(two, "A"), 3000);
+assert.equal(projectPrice(bankA, "A"), null);
+const picked = replacePlannedParts(
+  { ...two, entries: [...two.entries, { ...two.entries[0], type: "saving", linkId: "a1" }] },
+  "A",
+  projectPartsFor(affordOptions(two, { price: 3000, deadlineMonths: null }, today), 3000, "bank", today, names),
+  (i) => `n${i}`
+);
+const pickedA = picked.parts.filter((p) => p.projectId === "A");
+assert.equal(pickedA.length, 13); // from savings + 12 loan payments; a1 is gone
+assert.ok(!pickedA.some((p) => p.partId === "a1"));
+assert.equal(pickedA[0].project, "A");
+assert.equal(picked.entries.at(-1)?.linkId, "n0"); // money saved toward a1 follows the new parts
 
 // Savings category: an expense / bill in it comes out of the month and goes into savings (not the cushion).
 const deposit = {
@@ -622,7 +671,7 @@ assert.equal(forecast[0].change, 700);
 assert.equal(forecast[0].balance, savingsBalance(intoSavings) - 200 - 50 + 700);
 assert.equal(forecast[1].change, 1500 - 600 + 100 - averageEveryday(intoSavings, today));
 assert.equal(forecast[1].balance, forecast[0].balance + forecast[1].change);
-// Spent nearly everything: the projection stops at what's left (50), so the month adds just what went into savings.
+// Spent more than there is: everyday spending is still counted in full, so the shortfall comes out of savings.
 const spentAll = {
   ...intoSavings,
   entries: [
@@ -640,8 +689,9 @@ const spentAll = {
   ],
 };
 const [spentNov] = savingsForecast(spentAll, today, 1);
-assert.equal(spentNov.change, 200 + 50 + 100); // saved + Savings expense + Deposit bill
-assert.equal(spentNov.balance, savingsBalance(spentAll) + 100); // + the Deposit still due this month
+assert.equal(spentNov.spending, monthSummary(spentAll, today).projectedSpend - 50); // the Savings expense isn't spent
+assert.ok(spentNov.change < 0);
+assert.equal(spentNov.balance, savingsBalance(spentAll) - 200 - 50 + spentNov.change);
 // No past month with expenses: this month's pace (spent so far, extended to the whole month) is the usual spending.
 const fresh = { ...budget, settings: { ...budget.settings, startMonth: "2026-11" } };
 assert.equal(averageEveryday(fresh, today), (100 / 10) * 30); // 100 by the 10th of a 30-day month
@@ -652,6 +702,20 @@ const endsLoan = {
 };
 const [f0, f1, f2] = savingsForecast(endsLoan, today, 3).map((f) => f.balance);
 assert.equal(f2 - f1 - (f1 - f0), 200); // the 200 bill ends in December: January saves 200 more
+// A started project's bill is a project payment, named after the project, not one of the bills.
+const kitchenBill = {
+  ...budget.bills[0],
+  id: "pl",
+  amount: 150,
+  projectId: "k",
+  project: "Kitchen",
+  category: "Other",
+};
+const [withLoan0] = savingsForecast({ ...budget, bills: [...budget.bills, kitchenBill] }, today, 1);
+const [noLoan0] = savingsForecast(budget, today, 1);
+assert.equal(withLoan0.bills, noLoan0.bills);
+assert.deepEqual(withLoan0.projectItems, [{ name: "Kitchen", amount: 150 }]);
+assert.equal(withLoan0.change, noLoan0.change - 150);
 assert.ok(defaultBudget().categories.some((c) => c.name === "Savings"));
 assert.equal(withSavingsCategory(budget).categories.at(-1)?.name, "Savings");
 assert.equal(withSavingsCategory(defaultBudget()).categories.filter((c) => c.name === "Savings").length, 1);
