@@ -308,8 +308,12 @@ export const affordOptions = (b: Budget, order: OrderTerms, today: string) => {
   const spending = averageEveryday(b, today);
   const free = usualFreeMoney(b, today);
   const shortfall = Math.max(0, order.price - usable - canSave);
-  const saveMonths = shortfall === 0 ? 0 : free > 0 ? Math.ceil(shortfall / free) : Number.POSITIVE_INFINITY;
-  const borrow = Math.max(0, order.price - usable);
+  // Affordable now → the plans keep savings untouched, so there's still a way to buy later or on credit.
+  const keepSavings = shortfall === 0;
+  const planUsable = keepSavings ? 0 : usable;
+  const missing = Math.max(0, order.price - planUsable - canSave);
+  const saveMonths = missing === 0 ? 0 : free > 0 ? Math.ceil(missing / free) : Number.POSITIVE_INFINITY;
+  const borrow = Math.max(0, order.price - planUsable);
   const { rate, term } = loanTermsFor(b, order);
 
   const bank = [...new Set([...LOAN_TERMS, term])]
@@ -328,8 +332,8 @@ export const affordOptions = (b: Budget, order: OrderTerms, today: string) => {
   const deadline = order.deadlineMonths
     ? {
         months: order.deadlineMonths,
-        perMonth: shortfall / order.deadlineMonths,
-        fits: shortfall === 0 || (free > 0 && shortfall / order.deadlineMonths <= free),
+        perMonth: missing / order.deadlineMonths,
+        fits: missing === 0 || (free > 0 && missing / order.deadlineMonths <= free),
       }
     : null;
 
@@ -346,12 +350,13 @@ export const affordOptions = (b: Budget, order: OrderTerms, today: string) => {
   };
   const waits = Number.isFinite(saveMonths) ? spread(saveMonths - 1, MAX_COMBOS) : [];
   const combos = waits.map((wait) => {
-    const amount = order.price - usable - canSave - free * wait;
+    const amount = order.price - planUsable - canSave - free * wait;
     return { wait, buyMonth: addMonths(month, wait), borrow: amount, ...loanFor(amount) };
   });
 
   return {
     combos,
+    keepSavings,
     now: { savings: savingsBalance(b), cushion: cushion(b), usable, canSave, shortfall },
     monthly: { income: b.settings.usualIncome, bills: ongoingBills(b, month), spending, free },
     save: {
@@ -380,10 +385,10 @@ export type PayChoice = "now" | "save" | "bank" | "friend" | `combo-${number}`;
 
 /** Ways that apply to an order, in the order the picker lists them. */
 export const payChoices = (o: AffordOptions): PayChoice[] => {
-  // Affordable now → just buy; a loan is only a way to cover money that's actually missing.
-  if (o.now.shortfall === 0) return ["now"];
+  // Affordable now → "now" first; the rest are plans that keep savings (see `keepSavings`).
   return [
-    ...(o.save.readyMonth ? (["save"] as const) : []),
+    ...(o.keepSavings ? (["now"] as const) : []),
+    ...(o.save.readyMonth && o.save.months > 0 ? (["save"] as const) : []),
     ...(o.borrow > 0 ? (["bank"] as const) : []),
     ...o.combos.map((c) => `combo-${c.wait}` as const),
     ...(o.borrow > 0 ? (["friend"] as const) : []),

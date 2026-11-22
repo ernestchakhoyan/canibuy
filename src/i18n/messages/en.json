@@ -246,6 +246,7 @@
         "title": "Save up",
         "now": "You already have enough: pay from savings and this month's money.",
         "plan": "Put aside {amount} a month for {months}: ready in {month}.",
+        "keep": "Or keep your savings: put aside {amount} a month for {months}, ready in {month}.",
         "never": "Nothing is left over each month after bills and usual spending, so saving up won't get there.",
         "deadlineFits": "To buy within {months}: put aside {amount} a month. That fits.",
         "deadlineTooMuch": "To buy within {months} you'd need {amount} a month, more than you have free."
@@ -253,6 +254,7 @@
       "bank": {
         "title": "Bank loan at {rate}% a year",
         "amount": "Borrow {borrow}; your usable savings ({usable}) cover the rest.",
+        "amountKeep": "Borrow the full {borrow} and keep your savings.",
         "term": "Term",
         "payment": "Monthly",
         "interest": "Interest",

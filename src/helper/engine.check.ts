@@ -162,7 +162,13 @@ const names = {
   friend: (i: number, n: number) => `Friend ${i}/${n}`,
 };
 assert.deepEqual(payChoices(options), ["save", "bank", "combo-1", "combo-2", "friend"]);
-assert.deepEqual(payChoices(affordOptions(budget, { price: 1000, deadlineMonths: null }, today)), ["now"]);
+// Affordable now → "now" plus plans that keep savings: 1000 − 500 this month = 1 month to save; borrow it all.
+const affordable = affordOptions(budget, { price: 1000, deadlineMonths: null }, today);
+assert.deepEqual(payChoices(affordable), ["now", "save", "bank", "friend"]);
+assert.equal(affordable.keepSavings, true);
+assert.equal(affordable.save.months, 1);
+assert.equal(affordable.borrow, 1000);
+assert.equal(projectPartsFor(affordable, 1000, "bank", today, names).length, 12); // no part from savings
 assert.deepEqual(projectPartsFor(options, 3000, "save", today, names), [
   { part: "TV", cost: 3000, payMonth: "2027-02" },
 ]);

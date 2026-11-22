@@ -132,11 +132,10 @@ export function AffordOptions({ order }: { order: Order }) {
         </Option>
 
         <Option icon={PiggyBankIcon} title={t("save.title")}>
-          {o.now.shortfall === 0 ? (
-            <p>{t("save.now")}</p>
-          ) : o.save.readyMonth ? (
+          {o.now.shortfall === 0 && <p>{t("save.now")}</p>}
+          {o.save.months === 0 ? null : o.save.readyMonth ? (
             <p>
-              {t("save.plan", {
+              {t(o.keepSavings ? "save.keep" : "save.plan", {
                 amount: money(o.save.perMonth),
                 months: months(o.save.months),
                 month: monthLabel(o.save.readyMonth, locale),
@@ -145,7 +144,7 @@ export function AffordOptions({ order }: { order: Order }) {
           ) : (
             <p className="text-negative">{t("save.never")}</p>
           )}
-          {o.save.deadline && o.now.shortfall > 0 && (
+          {o.save.deadline && o.save.months > 0 && (
             <p className={cn(!o.save.deadline.fits && "text-negative")}>
               {t(o.save.deadline.fits ? "save.deadlineFits" : "save.deadlineTooMuch", {
                 months: months(o.save.deadline.months),
@@ -197,7 +196,9 @@ export function AffordOptions({ order }: { order: Order }) {
             <Option icon={LandmarkIcon} title={t("bank.title", { rate: o.rate })}>
               <LoanTerms order={order} rate={o.rate} term={o.term} />
               <p className="text-muted-foreground">
-                {t("bank.amount", { borrow: money(o.borrow), usable: money(o.now.usable) })}
+                {o.keepSavings
+                  ? t("bank.amountKeep", { borrow: money(o.borrow) })
+                  : t("bank.amount", { borrow: money(o.borrow), usable: money(o.now.usable) })}
               </p>
               <div className="overflow-x-auto">
                 <Table className="text-xs sm:text-sm">
