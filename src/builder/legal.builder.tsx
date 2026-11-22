@@ -5,8 +5,7 @@ import type { ReactNode } from "react";
 // Public legal pages linked from Google's OAuth consent screen. English only: they're legal text, and Google's
 // reviewers read them in English. ponytail: translate into hy/ru via messages if users ask for it.
 
-// TODO[techdebt]: set the real contact address before publishing the OAuth app.
-const CONTACT_EMAIL = "you@gmail.com";
+const CONTACT_EMAIL = "devchakhoyan@gmail.com";
 const UPDATED = "November 23, 2026";
 
 const Legal = ({ title, children }: { title: string; children: ReactNode }) => (
