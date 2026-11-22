@@ -160,8 +160,11 @@
       "label": "Project payments this month",
       "due": "{amount} due",
       "paid": "{amount} paid",
-      "hint": "Not taken from what's left until you pay: from savings or this month's money."
-    }
+      "hint": "Not taken from what's left until you pay: from savings or this month's money.",
+      "aboveCushion": "Paid from savings: {amount} left, above your safety cushion ({cushion}).",
+      "belowCushion": "Paid from savings: {amount} left, below your safety cushion ({cushion})."
+    },
+    "afterPayments": "After payments due: {amount}"
   },
   "expense": {
     "title": "Add expense",
@@ -326,7 +329,21 @@
       "parts": {
         "fromSavings": "From savings",
         "loan": "Loan payment {i}/{n}",
-        "friend": "Repay friend {i}/{n}"
+        "friend": "Repay friend {i}/{n}",
+        "custom": "Payment {i}/{n}"
+      },
+      "custom": {
+        "label": "Custom",
+        "hint": "Pick the amount, how many payments, how often and from when.",
+        "detail": "{count} × {amount}, every {every, select, week {week} year {year} other {month}}, from {month}.",
+        "differs": "{amount} {more, select, yes {more} other {less}} than the price.",
+        "count": "Over, months",
+        "every": "Every",
+        "amount": "Each payment",
+        "start": "First payment",
+        "week": "Week",
+        "month": "Month",
+        "year": "Year"
       }
     }
   },
@@ -469,6 +486,14 @@
     "timing": {
       "start": "Starts in",
       "next": "Next payment in"
+    },
+    "edit": {
+      "title": "Edit project",
+      "name": "Name",
+      "total": "Price",
+      "save": "Save",
+      "repay": "Change how to pay",
+      "error": "Enter a name and a price above 0."
     }
   },
   "outlook": {
@@ -637,7 +662,12 @@
       "orders": "Orders"
     },
     "baseline": "Without projects",
-    "baselineLegend": "Without projects: {amount}"
+    "baselineLegend": "Without projects: {amount}",
+    "explain": {
+      "monthChange": "How much savings grow or shrink in {month}: {income} coming in, minus {out} going out (bills, everyday spending, project and order payments).",
+      "sinceNow": "Savings at the end of {month}, minus what you have today ({now}).",
+      "status": "Your safety cushion is {cushion}: {months, plural, one {# month} other {# months}} of your recurring bills (Setup). The lowest your savings get in this range is {lowest}, in {month}."
+    }
   },
   "timing": {
     "thisMonth": "this month",

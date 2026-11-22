@@ -716,6 +716,78 @@ export function ProjectList() {
 }
 
 /** Archive / restore, and delete: before it starts, or once archived (then its bills go too, payments made stay). */
+/** Edit a project that hasn't started: its name, and its price with a new way to pay (replaces the planned parts). */
+function EditProject({ projectId, name, price }: { projectId: string; name: string; price: number }) {
+  const t = useTranslations("projects.edit");
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [choosing, setChoosing] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const next = String(form.get("name")).trim();
+    const total = parseAmount(String(form.get("total")));
+    if (!next || !total || total <= 0) return setError(t("error"));
+    setError("");
+    haptic();
+    budgetActions.editProject(projectId, next);
+    // A new price, or "Change how to pay": pick the way for it.
+    if (total !== price || (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "repay")
+      setChoosing(total);
+    else setOpen(false);
+  };
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger render={<Button variant="outline" className="w-full" />}>
+        <PencilIcon data-icon="inline-start" />
+        {t("title")}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <form onSubmit={submit} className="pt-4">
+          <FieldGroup className="grid grid-cols-2 gap-4">
+            <Field className="col-span-2">
+              <FieldLabel htmlFor={`${id}-name`}>{t("name")}</FieldLabel>
+              <Input id={`${id}-name`} name="name" required defaultValue={name} />
+            </Field>
+            <Field className="col-span-2" data-invalid={!!error || undefined}>
+              <FieldLabel htmlFor={`${id}-total`}>{t("total")}</FieldLabel>
+              <Input
+                id={`${id}-total`}
+                name="total"
+                inputMode="decimal"
+                required
+                autoComplete="off"
+                defaultValue={price}
+                aria-invalid={!!error || undefined}
+              />
+            </Field>
+            {error && <FieldError className="col-span-2">{error}</FieldError>}
+            <Button type="submit">{t("save")}</Button>
+            <Button type="submit" variant="outline" value="repay">
+              {t("repay")}
+            </Button>
+          </FieldGroup>
+        </form>
+      </CollapsibleContent>
+      {choosing !== null && (
+        <PayChoiceSheet
+          item={name}
+          price={choosing}
+          open
+          onOpenChange={(o) => !o && setChoosing(null)}
+          title={t("repay")}
+          action={t("save")}
+          onConfirm={(_, parts) => {
+            budgetActions.editProject(projectId, name, parts);
+            setOpen(false);
+          }}
+        />
+      )}
+    </Collapsible>
+  );
+}
+
 function ProjectActions({ projectId, archived, started }: { projectId: string; archived: boolean; started: boolean }) {
   const t = useTranslations("projects.actions");
   const router = useRouter();
@@ -912,6 +984,13 @@ export function ProjectDetails() {
         </Link>
       )}
 
+      {!started && status !== "archived" && (
+        <EditProject
+          projectId={id}
+          name={record.name}
+          price={parts.filter((p) => p.status === "Planned").reduce((t, p) => t + p.cost, 0)}
+        />
+      )}
       <ProjectActions projectId={id} archived={status === "archived"} started={started} />
     </>
   );

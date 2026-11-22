@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney, monthSummary, savingsBalance, todayISO } from "@helper";
+import { cn, cushion, formatMoney, monthSummary, savingsBalance, todayISO } from "@helper";
 import { budgetActions, useLoadedBudget } from "@store";
 import {
   Alert,
@@ -13,7 +13,7 @@ import {
   Separator,
   Stat,
 } from "@widget";
-import { ChevronRightIcon, HammerIcon, SparklesIcon } from "lucide-react";
+import { ChevronRightIcon, CircleAlertIcon, CircleCheckIcon, HammerIcon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -27,6 +27,11 @@ export function MonthOverview() {
   // Red / green would give away the sign of a hidden amount.
   const tone = (shown: "positive" | "negative" | "default") => (hidden ? "default" : shown);
   const s = monthSummary(b, todayISO());
+  // Salary goes into savings and payments come out of them: what savings come to once this month's due project
+  // payments are paid, against the safety cushion.
+  const savings = savingsBalance(b);
+  const afterPayments = savings - s.projectsDue;
+  const safety = cushion(b);
   const needsSetup = b.settings.usualIncome === 0 && b.bills.length === 0;
 
   return (
@@ -76,7 +81,12 @@ export function MonthOverview() {
             value={money(s.projectedSpend)}
             hint={t("spentSoFar", { amount: money(s.spent) })}
           />
-          <Stat label={t("savingsBalance")} value={money(savingsBalance(b))} tone={tone("positive")} />
+          <Stat
+            label={t("savingsBalance")}
+            value={money(savings)}
+            tone={tone("positive")}
+            hint={s.projectsDue > 0 ? t("afterPayments", { amount: money(afterPayments) }) : undefined}
+          />
         </div>
         {(s.projectsDue > 0 || s.projectsPaid > 0) && (
           <>
@@ -92,6 +102,24 @@ export function MonthOverview() {
                   {s.projectsPaid > 0 && `${t("projects.paid", { amount: money(s.projectsPaid) })} · `}
                   {t("projects.hint")}
                 </span>
+                {s.projectsDue > 0 && (
+                  <span
+                    className={cn(
+                      "flex items-center gap-1 text-xs font-medium",
+                      !hidden && (afterPayments < safety ? "text-warning" : "text-positive")
+                    )}
+                  >
+                    {afterPayments < safety ? (
+                      <CircleAlertIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <CircleCheckIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                    )}
+                    {t(afterPayments < safety ? "projects.belowCushion" : "projects.aboveCushion", {
+                      amount: money(afterPayments),
+                      cushion: money(safety),
+                    })}
+                  </span>
+                )}
               </span>
               <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             </Link>

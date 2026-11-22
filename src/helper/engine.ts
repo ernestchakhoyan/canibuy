@@ -1,5 +1,5 @@
 import type { Bill, Budget, CurrencyCode, Entry, EntryType, Order, Project, ProjectPart } from "@type";
-import { addMonths, daysInMonth, monthOf } from "./date";
+import { addDays, addMonths, daysInMonth, monthOf } from "./date";
 import { newId } from "./money";
 
 // Calculation rules from PRD section 7. Everything is derived from raw rows; nothing calculated is stored.
@@ -467,6 +467,65 @@ export const projectPartsFor = (
   if (choice === "friend") return financed(month, o.borrow, o.friend.perMonth, names.friend, "friend");
   const combo = o.combos.find((c) => `combo-${c.wait}` === choice);
   return combo ? financed(combo.buyMonth, combo.borrow, combo.payment, names.loan, "bank") : buyNow(month);
+};
+
+/** A schedule the user sets: `count` payments of `amount`, one every week, month or year from `start` (YYYY-MM-DD). */
+export type CustomPlan = { amount: number; count: number; every: "week" | "month" | "year"; start: string };
+
+/** How many payments fit in `months` from `start` (YYYY-MM-DD): a week's, a month's or a year's worth each. */
+export const customCount = (months: number, every: CustomPlan["every"], start: string) => {
+  if (every === "month") return months;
+  if (every === "year") return Math.ceil(months / 12);
+  const end = `${addMonths(monthOf(start), months)}${start.slice(7)}`;
+  return Math.ceil(Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) / 7);
+};
+
+/**
+ * One part per payment of a custom schedule. They're monthly payments of your own money ("saving"), so Start
+ * keeps their dates and bills them instead of splitting them again; weekly ones can share a month.
+ */
+export const customParts = (plan: CustomPlan, name: (i: number, n: number) => string): NewPart[] =>
+  Array.from({ length: plan.count }, (_, i) => ({
+    part: name(i + 1, plan.count),
+    cost: cents(plan.amount),
+    payMonth:
+      plan.every === "week"
+        ? monthOf(addDays(plan.start, 7 * i))
+        : addMonths(monthOf(plan.start), plan.every === "year" ? 12 * i : i),
+    installment: "saving" as const,
+  }));
+
+/**
+ * The budget with an unpaid part's cost changed. A monthly payment ("saving": a custom schedule or a split part)
+ * keeps its series' total: the series' other unpaid payments share the difference (whole units for big amounts,
+ * the last takes the rounding; never below 0). A series = same project and name before " i/n". Other parts change alone.
+ */
+export const repricePart = (b: Budget, partId: string, cost: number): Budget => {
+  const part = b.parts.find((p) => p.partId === partId && p.status === "Planned");
+  if (!part) return b;
+  const series = (p: ProjectPart) => p.part.replace(/ \d+\/\d+$/, "");
+  const others =
+    part.installment === "saving"
+      ? b.parts.filter(
+          (p) =>
+            p.partId !== partId &&
+            p.projectId === part.projectId &&
+            p.status === "Planned" &&
+            p.installment === "saving" &&
+            series(p) === series(part)
+        )
+      : [];
+  const rest = Math.max(
+    0,
+    others.reduce((t, p) => t + p.cost, part.cost - cost)
+  );
+  const round = rest >= 1000 ? Math.round : cents;
+  const share = others.length > 0 ? round(rest / others.length) : 0;
+  const costs = new Map<string, number>([[partId, cost]]);
+  others.forEach((p, i) => {
+    costs.set(p.partId, i < others.length - 1 ? share : Math.max(0, cents(rest - share * (others.length - 1))));
+  });
+  return { ...b, parts: b.parts.map((p) => (costs.has(p.partId) ? { ...p, cost: costs.get(p.partId) ?? p.cost } : p)) };
 };
 
 /**

@@ -11,6 +11,8 @@ import {
   baseCurrency,
   convertBudget,
   cushion,
+  customCount,
+  customParts,
   fundProject,
   loanPayment,
   monthBills,
@@ -33,6 +35,7 @@ import {
   recordSavingsBills,
   repairProjects,
   replacePlannedParts,
+  repricePart,
   rescheduleProject,
   restoreInstallments,
   savingsAccounts,
@@ -194,6 +197,58 @@ assert.equal(comboParts[1].payMonth, "2027-02");
 const friendParts = projectPartsFor(options, 3000, "friend", today, names);
 assert.equal(friendParts[1].cost, 191.67);
 assert.equal(friendParts[1].part, "Friend 1/12");
+// 5 months from Dec 1: 22 weeks (151 days), 5 months, 1 year.
+assert.equal(customCount(5, "week", "2026-12-01"), 22);
+assert.equal(customCount(5, "month", "2026-12-01"), 5);
+assert.equal(customCount(5, "year", "2026-12-01"), 1);
+// Custom schedule: 5 × 200 000 monthly from January; weekly ones can share a month; yearly ones a year apart.
+const pay = (i: number, n: number) => `Pay ${i}/${n}`;
+const monthly = customParts({ amount: 200000, count: 5, every: "month", start: "2027-01-15" }, pay);
+assert.deepEqual(
+  monthly.map((p) => p.payMonth),
+  ["2027-01", "2027-02", "2027-03", "2027-04", "2027-05"]
+);
+assert.deepEqual(monthly[4], { part: "Pay 5/5", cost: 200000, payMonth: "2027-05", installment: "saving" });
+assert.deepEqual(
+  customParts({ amount: 50, count: 3, every: "week", start: "2027-01-20" }, pay).map((p) => p.payMonth),
+  ["2027-01", "2027-01", "2027-02"]
+);
+assert.deepEqual(
+  customParts({ amount: 50, count: 2, every: "year", start: "2027-03-01" }, pay).map((p) => p.payMonth),
+  ["2027-03", "2028-03"]
+);
+// Editing one payment of a series: the others share what's left of 7 000 000; other parts don't move.
+const series = {
+  ...budget,
+  parts: [
+    ...customParts({ amount: 1750000, count: 4, every: "month", start: "2026-12-01" }, pay).map((p, i) => ({
+      ...p,
+      projectId: "s",
+      project: "S",
+      partId: `s${i}`,
+      status: "Planned" as const,
+      paidDate: "",
+    })),
+    {
+      projectId: "s",
+      project: "S",
+      partId: "x",
+      part: "Other",
+      cost: 5,
+      payMonth: "2027-01",
+      status: "Planned" as const,
+      paidDate: "",
+    },
+  ],
+};
+assert.deepEqual(
+  repricePart(series, "s0", 4000000).parts.map((p) => p.cost),
+  [4000000, 1000000, 1000000, 1000000, 5]
+);
+assert.deepEqual(
+  repricePart(series, "x", 9).parts.map((p) => p.cost),
+  [1750000, 1750000, 1750000, 1750000, 9]
+);
 // Starting a financed project: instalments become a bill over their months; other parts are paid by hand.
 const started = {
   ...budget,

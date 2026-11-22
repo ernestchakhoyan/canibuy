@@ -34,8 +34,9 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@widget";
-import { ChevronDownIcon, CircleAlertIcon, CircleCheckIcon, TriangleAlertIcon } from "lucide-react";
+import { ChevronDownIcon, CircleAlertIcon, CircleCheckIcon, InfoIcon, TriangleAlertIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 import { Fragment, useId, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from "recharts";
 
@@ -103,6 +104,7 @@ export function SavingsForecast({ budget, baseline }: Props = {}) {
       : { icon: CircleCheckIcon, tone: "text-positive", text: t("onTrack") };
   const StatusIcon = status.icon;
   const sinceNow = selected.balance - savingsBalance(b);
+  const lowest = data.reduce((min, f) => (f.balance < min.balance ? f : min), data[0]);
 
   return (
     <Card
@@ -142,20 +144,41 @@ export function SavingsForecast({ budget, baseline }: Props = {}) {
       </div>
       <div className="flex flex-col gap-1">
         <span className="text-3xl font-semibold tracking-tight tabular-nums">{money(selected.balance)}</span>
-        <dl className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <dt className="text-muted-foreground">{t("monthChange")}</dt>
-            <dd className={cn("font-medium tabular-nums", changeTone(selected.change))}>{signed(selected.change)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">{t("sinceNow")}</dt>
-            <dd className={cn("font-medium tabular-nums", changeTone(sinceNow))}>{signed(sinceNow)}</dd>
-          </div>
-        </dl>
-        <p className={cn("mt-1 flex items-center gap-1.5 text-sm", !hidden && status.tone)}>
-          <StatusIcon className="size-4 shrink-0" aria-hidden="true" />
-          {status.text}
-        </p>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <Explain
+            label={<span className="text-muted-foreground">{t("monthChange")}</span>}
+            text={t("explain.monthChange", {
+              month: monthLabel(selected.month, locale),
+              income: money(selected.income + selected.toSavings),
+              out: money(selected.bills + selected.spending + selected.projects + selected.orders),
+            })}
+          >
+            <span className={cn("font-medium tabular-nums", changeTone(selected.change))}>
+              {signed(selected.change)}
+            </span>
+          </Explain>
+          <Explain
+            label={<span className="text-muted-foreground">{t("sinceNow")}</span>}
+            text={t("explain.sinceNow", { month: monthLabel(selected.month, locale), now: money(savingsBalance(b)) })}
+          >
+            <span className={cn("font-medium tabular-nums", changeTone(sinceNow))}>{signed(sinceNow)}</span>
+          </Explain>
+        </div>
+        <Explain
+          className="mt-1"
+          label={
+            <span className={cn("flex items-center gap-1.5", !hidden && status.tone)}>
+              <StatusIcon className="size-4 shrink-0" aria-hidden="true" />
+              {status.text}
+            </span>
+          }
+          text={t("explain.status", {
+            cushion: money(safety),
+            months: b.settings.cushionMonths,
+            lowest: money(lowest.balance),
+            month: monthLabel(lowest.month, locale),
+          })}
+        />
       </div>
       <ChartContainer config={config} className="aspect-auto h-56 w-full">
         <AreaChart
@@ -372,5 +395,29 @@ function Breakdown({
             : ""}
       </p>
     </dl>
+  );
+}
+
+/** A label with an ⓘ that shows `text` under it on tap (a tooltip that works on touch); `children` go below the label. */
+function Explain({
+  label,
+  text,
+  children,
+  className,
+}: {
+  label: ReactNode;
+  text: string;
+  children?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <details className={cn("group text-sm", className)}>
+      <summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
+        {label}
+        <InfoIcon className="size-3.5 shrink-0 text-muted-foreground group-open:text-primary" aria-hidden="true" />
+      </summary>
+      {children}
+      <p className="mt-1 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">{text}</p>
+    </details>
   );
 }

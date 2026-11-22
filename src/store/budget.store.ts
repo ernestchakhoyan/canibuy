@@ -32,6 +32,7 @@ import {
   recordSavingsBills,
   repairProjects,
   replacePlannedParts,
+  repricePart,
   rescheduleProject,
   SAVINGS_CATEGORY,
   SHEET_TABS,
@@ -430,12 +431,16 @@ export const budgetActions = {
   movePart: (partId: string, payMonth: string) =>
     update((b) => ({ ...b, parts: b.parts.map((p) => (p.partId === partId ? { ...p, payMonth } : p)) })),
   removePart: (partId: string) => update((b) => ({ ...b, parts: b.parts.filter((p) => p.partId !== partId) })),
-  /** Edits an unpaid part's name, cost and month. */
+  /** Edits an unpaid part's name, cost and month; a monthly payment's series keeps its total (see `repricePart`). */
   updatePart: (partId: string, change: Pick<ProjectPart, "part" | "cost" | "payMonth">) =>
-    update((b) => ({
-      ...b,
-      parts: b.parts.map((p) => (p.partId === partId && p.status === "Planned" ? { ...p, ...change } : p)),
-    })),
+    update((b) => {
+      const { cost, ...rest } = change;
+      const next = repricePart(b, partId, cost);
+      return {
+        ...next,
+        parts: next.parts.map((p) => (p.partId === partId && p.status === "Planned" ? { ...p, ...rest } : p)),
+      };
+    }),
   /** Pays a plan the chosen way: save up, bank loan or friend (see `fundProject`). */
   fundProject: (projectId: string, choice: Funding, label: (i: number, n: number) => string) =>
     update((b) => fundProject(b, projectId, choice, todayISO(), label, newId)),
@@ -490,6 +495,17 @@ export const budgetActions = {
     update((b) =>
       projectStarted(b, projectId) ? b : upsertProject(b, projectId, { draft: planned ? undefined : true })
     ),
+  /** Renames a project that hasn't started and, given `parts` (a new way to pay), swaps its planned parts. */
+  editProject: (projectId: string, name: string, parts?: ReturnType<typeof projectPartsFor>) =>
+    update((b) => {
+      if (projectStarted(b, projectId)) return b;
+      const renamed = upsertProject(
+        { ...b, parts: b.parts.map((p) => (p.projectId === projectId ? { ...p, project: name } : p)) },
+        projectId,
+        { name }
+      );
+      return parts ? replacePlannedParts(renamed, projectId, parts, newId) : renamed;
+    }),
   /** Archives (hides from the active tabs) or restores a project; nothing about its money changes. */
   archiveProject: (projectId: string, archived: boolean) =>
     update((b) => upsertProject(b, projectId, { archivedDate: archived ? todayISO() : undefined })),
