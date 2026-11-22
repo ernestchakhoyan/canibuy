@@ -3,7 +3,6 @@
 export type Settings = {
   currency: string;
   usualIncome: number;
-  openingSavings: number;
   cushionMonths: number;
   loanRate: number;
   loanTermMonths: number;

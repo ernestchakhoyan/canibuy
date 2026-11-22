@@ -3,6 +3,7 @@
 import {
   addMonths,
   cn,
+  type Funding,
   formatMoney,
   haptic,
   type Lender,
@@ -12,7 +13,9 @@ import {
   type ProjectStatus,
   parseAmount,
   paymentSplit,
+  projectFunding,
   projectPlan,
+  projectRank,
   projectStart,
   projectStarted,
   projectSummary,
@@ -42,6 +45,8 @@ import {
   NativeSelect,
   NativeSelectOption,
   Progress,
+  RadioGroup,
+  RadioGroupItem,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -62,11 +67,14 @@ import {
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
+  ArrowDownIcon,
   ArrowLeftIcon,
+  ArrowUpIcon,
   CheckCircle2Icon,
   ChevronRightIcon,
   HammerIcon,
   LandmarkIcon,
+  PencilIcon,
   PlayIcon,
   PlusIcon,
   ReceiptIcon,
@@ -83,25 +91,42 @@ const monthOptions = () => {
   return Array.from({ length: MONTHS_AHEAD + 1 }, (_, i) => addMonths(current, i));
 };
 
-/** Part fields shared by the new-project form and the add-part form. */
-function PartFields() {
+type PartDefaults = Pick<ProjectPart, "part" | "cost" | "payMonth">;
+
+/** Part fields shared by the new-project, add-part and edit-part forms; `defaults` pre-fills them for editing. */
+function PartFields({ defaults }: { defaults?: PartDefaults }) {
   const t = useTranslations("projects");
   const locale = useLocale();
   const id = useId(); // rendered once per project card, so ids must be unique
+  const months = monthOptions();
   return (
     <>
       <Field className="col-span-2">
         <FieldLabel htmlFor={`${id}-part`}>{t("part.name")}</FieldLabel>
-        <Input id={`${id}-part`} name="part" required placeholder={t("part.namePlaceholder")} />
+        <Input
+          id={`${id}-part`}
+          name="part"
+          required
+          defaultValue={defaults?.part}
+          placeholder={t("part.namePlaceholder")}
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor={`${id}-cost`}>{t("part.cost")}</FieldLabel>
-        <Input id={`${id}-cost`} name="cost" inputMode="decimal" required autoComplete="off" placeholder="20,000" />
+        <Input
+          id={`${id}-cost`}
+          name="cost"
+          inputMode="decimal"
+          required
+          autoComplete="off"
+          defaultValue={defaults?.cost}
+          placeholder="20,000"
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor={`${id}-month`}>{t("part.payIn")}</FieldLabel>
-        <NativeSelect id={`${id}-month`} name="payMonth" className="w-full">
-          {monthOptions().map((m) => (
+        <NativeSelect id={`${id}-month`} name="payMonth" className="w-full" defaultValue={defaults?.payMonth}>
+          {(!defaults || months.includes(defaults.payMonth) ? months : [defaults.payMonth, ...months]).map((m) => (
             <NativeSelectOption key={m} value={m}>
               {monthLabel(m, locale)}
             </NativeSelectOption>
@@ -180,6 +205,173 @@ function AddPartForm({ projectId }: { projectId: string }) {
         </form>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+/** Inline editor for one unpaid part: name, cost and month. */
+function EditPart({ part, onDone }: { part: ProjectPart; onDone: () => void }) {
+  const t = useTranslations("projects");
+  const [error, setError] = useState("");
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const change = readPart(new FormData(event.currentTarget));
+    if (!change) return setError(t("form.costError"));
+    budgetActions.updatePart(part.partId, change);
+    onDone();
+  };
+  return (
+    <form onSubmit={submit} className="w-full basis-full">
+      <FieldGroup className="grid grid-cols-2 gap-4">
+        <PartFields defaults={part} />
+        {error && <FieldError className="col-span-2">{error}</FieldError>}
+        <Button type="submit">{t("part.save")}</Button>
+        <Button type="button" variant="outline" onClick={onDone}>
+          {t("pay.cancel")}
+        </Button>
+      </FieldGroup>
+    </form>
+  );
+}
+
+/**
+ * A plan savings and salary don't cover (after the projects ahead of it): save up, a bank loan or a friend's
+ * loan, the best one pre-selected. Applying it rewrites the parts into that payment plan.
+ */
+function ProjectFunding({ projectId }: { projectId: string }) {
+  const t = useTranslations("projects.funding");
+  const tp = useTranslations("orders.toProject");
+  const ta = useTranslations("orders.afford");
+  const locale = useLocale();
+  const id = useId();
+  const b = useLoadedBudget();
+  const money = (n: number) => formatMoney(Math.round(n), b.settings.currency, locale);
+  const months = (count: number) => ta("months", { count });
+  const [choice, setChoice] = useState<Funding | undefined>(undefined);
+  const f = projectFunding(b, projectId, todayISO());
+  if (!f) return null;
+  const selected = choice ?? f.best;
+  const borrowed = { amount: money(f.borrow), month: monthLabel(f.month, locale), months: months(f.term) };
+
+  const options: { value: Funding; label: string; detail: string; fits: boolean; total: number }[] = [
+    {
+      value: "save",
+      label: t("save.label"),
+      detail: f.save.month
+        ? t("save.detail", { months: months(f.save.wait), month: monthLabel(f.save.month, locale) })
+        : t("save.never"),
+      fits: f.save.month !== null,
+      total: 0,
+    },
+    {
+      value: "bank",
+      label: t("bank.label"),
+      detail: t("bank.detail", {
+        ...borrowed,
+        payment: money(f.bank.payment),
+        rate: f.rate,
+        interest: money(f.bank.interest),
+      }),
+      fits: f.bank.fits,
+      total: f.bank.interest,
+    },
+    {
+      value: "friend",
+      label: t("friend.label"),
+      detail: t("friend.detail", { ...borrowed, payment: money(f.friend.payment), saved: money(f.bank.interest) }),
+      fits: f.friend.fits,
+      total: 0,
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg bg-warning/10 p-3 text-sm">
+      <p className="flex items-center gap-2 font-semibold text-warning">
+        <LandmarkIcon className="size-4 shrink-0" aria-hidden="true" />
+        {t("intro", { amount: money(f.borrow), month: monthLabel(f.month, locale) })}
+      </p>
+      <RadioGroup
+        value={selected}
+        onValueChange={(v) => setChoice(v as Funding)}
+        aria-label={t("title")}
+        className="gap-2"
+      >
+        {options.map((o) => (
+          <label
+            key={o.value}
+            htmlFor={`${id}-${o.value}`}
+            className={cn(
+              "flex cursor-pointer items-start gap-3 rounded-xl border bg-card p-3 transition-colors",
+              selected === o.value ? "border-primary bg-primary/5" : "hover:bg-muted"
+            )}
+          >
+            <RadioGroupItem
+              value={o.value}
+              id={`${id}-${o.value}`}
+              className="mt-0.5"
+              disabled={!f.save.month && o.value === "save"}
+            />
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="font-semibold">{o.label}</span>
+                {f.best === o.value && <Badge>{t("best")}</Badge>}
+              </span>
+              <span className="text-muted-foreground">{o.detail}</span>
+              {o.value !== "save" && !o.fits && <span className="text-xs text-negative">{tp("tooMuch")}</span>}
+            </span>
+          </label>
+        ))}
+      </RadioGroup>
+      <Button
+        onClick={() => {
+          haptic();
+          budgetActions.fundProject(projectId, selected, (i, n) =>
+            tp(selected === "friend" ? "parts.friend" : "parts.loan", { i, n })
+          );
+        }}
+      >
+        <CheckCircle2Icon data-icon="inline-start" />
+        {t("apply")}
+      </Button>
+    </div>
+  );
+}
+
+/** A plan's place in the priority order; the plans ahead of it (and every started project) are paid first. */
+function ProjectPriority({ projectId }: { projectId: string }) {
+  const t = useTranslations("projects.priority");
+  const b = useLoadedBudget();
+  const rank = projectRank(b);
+  const at = rank.findIndex((p) => p.id === projectId);
+  const plans = rank.filter((p) => !projectStarted(b, p.id));
+  const planAt = plans.findIndex((p) => p.id === projectId);
+  if (at < 0 || planAt < 0) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 text-sm">
+      <span className="text-muted-foreground">
+        {t("label", { n: at + 1, count: rank.length })}
+        {at > 0 && <span className="block text-xs">{t("ahead", { count: at })}</span>}
+      </span>
+      <span className="flex gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label={t("up")}
+          disabled={planAt === 0}
+          onClick={() => budgetActions.moveProject(projectId, -1)}
+        >
+          <ArrowUpIcon />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label={t("down")}
+          disabled={planAt === plans.length - 1}
+          onClick={() => budgetActions.moveProject(projectId, 1)}
+        >
+          <ArrowDownIcon />
+        </Button>
+      </span>
+    </div>
   );
 }
 
@@ -377,7 +569,11 @@ export function ProjectList() {
   const syncFailed = useSheetSyncFailed("projects");
   const [creating, setCreating] = useState(false);
   const today = todayISO();
-  const summaries = projectsOf(b).map((p) => projectSummary(b, p, today));
+  // Priority order (started first, then plans as ordered), archived ones last.
+  const ranked = projectRank(b);
+  const summaries = [...ranked, ...projectsOf(b).filter((p) => !ranked.includes(p))].map((p) =>
+    projectSummary(b, p, today)
+  );
   const inTab = (tab: (typeof TABS)[number]) => (tab === "all" ? summaries : summaries.filter((s) => s.status === tab));
 
   return (
@@ -501,6 +697,7 @@ export function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
   const money = (n: number) => formatMoney(Math.round(n), b.settings.currency, locale);
   const today = todayISO();
+  const [editing, setEditing] = useState<string | null>(null);
   const record = projectsOf(b).find((p) => p.id === id);
   const back = (
     <Link href="/projects" className="flex min-h-11 items-center gap-1 self-start text-sm text-muted-foreground">
@@ -525,6 +722,7 @@ export function ProjectDetails() {
   const summary = projectSummary(b, record, today);
   const { parts, started, status } = summary;
   const plan = projectPlan(b, id, today);
+  const funding = projectFunding(b, id, today) !== null;
   const months = monthOptions();
 
   return (
@@ -539,6 +737,7 @@ export function ProjectDetails() {
 
       <Card>
         {summary.total > 0 && <PaymentProgress paid={summary.paid} total={summary.total} progress={summary.progress} />}
+        {!started && status !== "archived" && <ProjectPriority projectId={id} />}
         <ProjectStart projectId={id} project={record.name} />
         {plan.total > 0 &&
           (plan.covered ? (
@@ -546,6 +745,8 @@ export function ProjectDetails() {
               <CheckCircle2Icon className="size-4" aria-hidden="true" />
               {t("card.covered")}
             </p>
+          ) : funding ? (
+            <ProjectFunding projectId={id} />
           ) : (
             <div className="flex flex-col gap-1 rounded-lg bg-warning/10 px-3 py-2 text-sm">
               <p className="flex items-center gap-2 font-semibold text-warning">
@@ -570,35 +771,51 @@ export function ProjectDetails() {
           <ul className="divide-y">
             {parts.map((p) => (
               <li key={p.partId} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium">{p.part}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">{money(p.cost)}</span>
-                </div>
-                {p.status === "Paid" ? (
-                  <Badge variant="outline">{t("card.paidOn", { date: p.paidDate })}</Badge>
+                {editing === p.partId ? (
+                  <EditPart part={p} onDone={() => setEditing(null)} />
                 ) : (
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <NativeSelect
-                      aria-label={t("card.paymentMonth", { name: p.part })}
-                      value={p.payMonth}
-                      onChange={(e) => budgetActions.movePart(p.partId, e.target.value)}
-                    >
-                      {(months.includes(p.payMonth) ? months : [p.payMonth, ...months]).map((m) => (
-                        <NativeSelectOption key={m} value={m}>
-                          {monthLabel(m, locale)}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={t("card.remove", { name: p.part })}
-                      onClick={() => budgetActions.removePart(p.partId)}
-                    >
-                      <XIcon />
-                    </Button>
-                    {started && <PayPart part={p} />}
-                  </div>
+                  <>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{p.part}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">{money(p.cost)}</span>
+                    </div>
+                    {p.status === "Paid" ? (
+                      <Badge variant="outline">{t("card.paidOn", { date: p.paidDate })}</Badge>
+                    ) : (
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <NativeSelect
+                          aria-label={t("card.paymentMonth", { name: p.part })}
+                          value={p.payMonth}
+                          onChange={(e) => budgetActions.movePart(p.partId, e.target.value)}
+                        >
+                          {(months.includes(p.payMonth) ? months : [p.payMonth, ...months]).map((m) => (
+                            <NativeSelectOption key={m} value={m}>
+                              {monthLabel(m, locale)}
+                            </NativeSelectOption>
+                          ))}
+                        </NativeSelect>
+                        {!(started && p.installment) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t("card.edit", { name: p.part })}
+                            onClick={() => setEditing(p.partId)}
+                          >
+                            <PencilIcon />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={t("card.remove", { name: p.part })}
+                          onClick={() => budgetActions.removePart(p.partId)}
+                        >
+                          <XIcon />
+                        </Button>
+                        {started && <PayPart part={p} />}
+                      </div>
+                    )}
+                  </>
                 )}
               </li>
             ))}

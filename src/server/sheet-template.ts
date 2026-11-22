@@ -263,7 +263,6 @@ const monthTables = (month: string) => [
 const settingsRows = (s: Settings): [string, string | number][] => [
   ["currency", s.currency],
   ["usual_income", s.usualIncome],
-  ["opening_savings", s.openingSavings],
   ["cushion_months", s.cushionMonths],
   ["loan_rate", s.loanRate],
   ["loan_term_months", s.loanTermMonths],
@@ -653,7 +652,6 @@ export const parseSheet = (tables: {
       Object.entries({
         currency: currency && currency.length <= 5 ? currency : undefined,
         usualIncome: amount("usual_income"),
-        openingSavings: amount("opening_savings"),
         cushionMonths: amount("cushion_months"),
         loanRate: amount("loan_rate"),
         loanTermMonths: termMonths && Number.isInteger(termMonths) ? termMonths : undefined,

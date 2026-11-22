@@ -332,7 +332,8 @@
       "namePlaceholder": "Furniture",
       "cost": "Cost",
       "payIn": "Pay in",
-      "add": "Add part"
+      "add": "Add part",
+      "save": "Save"
     },
     "card": {
       "left": "{amount} left",
@@ -342,7 +343,8 @@
       "notAffordable": "Not affordable without a loan within 10 years.",
       "paidOn": "Paid {date}",
       "paymentMonth": "Payment month for {name}",
-      "remove": "Remove {name}"
+      "remove": "Remove {name}",
+      "edit": "Edit {name}"
     },
     "table": {
       "caption": "Month by month",
@@ -425,6 +427,31 @@
       "deleteConfirm": "Delete this project and its parts? This can't be undone.",
       "deleteYes": "Delete",
       "cancel": "Cancel"
+    },
+    "funding": {
+      "title": "How to pay for it",
+      "intro": "{amount} is missing in {month}. How will you cover it?",
+      "best": "Best option",
+      "apply": "Use this plan",
+      "save": {
+        "label": "Save up",
+        "detail": "Wait {months}: pay in {month}, no loan, no interest.",
+        "never": "Saving alone won't cover it within 10 years."
+      },
+      "bank": {
+        "label": "Bank loan",
+        "detail": "Borrow {amount} in {month}: {payment} a month for {months} at {rate}%, +{interest} interest."
+      },
+      "friend": {
+        "label": "Borrow from a friend",
+        "detail": "Borrow {amount} in {month}: {payment} a month for {months}, no interest ({saved} less than the bank)."
+      }
+    },
+    "priority": {
+      "label": "Priority {n} of {count}",
+      "ahead": "Pays {count, plural, one {# project} other {# projects}} ahead of it first.",
+      "up": "Move up",
+      "down": "Move down"
     }
   },
   "setup": {
@@ -435,7 +462,6 @@
       "title": "Money basics",
       "currency": "Currency",
       "usualIncome": "Usual monthly income",
-      "openingSavings": "Current savings",
       "cushionMonths": "Safety cushion (months of bills)",
       "loanRate": "Loan interest (% per year)",
       "loanTermMonths": "Loan term (months)",
@@ -548,6 +574,32 @@
     "account": {
       "title": "Account & data",
       "hint": "Google Sheet connection, start over"
+    }
+  },
+  "forecast": {
+    "title": "Savings outlook",
+    "description": "If each month's free money goes into savings, with your recurring bills as they start and end.",
+    "range": "Forecast range",
+    "years": "{count, plural, one {# year} other {# years}}",
+    "inMonths": "{count, plural, one {In # month} other {In # months}}",
+    "balance": "Savings",
+    "onTrack": "Stays above your safety cushion",
+    "belowCushion": "Dips below your safety cushion in {month}",
+    "runsOut": "Savings run out in {month}",
+    "cushion": "Safety cushion {amount}",
+    "pick": "Show the balance for",
+    "thisMonth": "End of this month",
+    "monthChange": "Change that month",
+    "sinceNow": "Change from today",
+    "byMonth": "Month by month",
+    "month": "Month",
+    "breakdown": {
+      "income": "Income",
+      "bills": "Bills",
+      "toSavings": "Savings bills (back into savings)",
+      "spending": "Everyday spending",
+      "projects": "Project payments",
+      "total": "Change that month"
     }
   }
 }

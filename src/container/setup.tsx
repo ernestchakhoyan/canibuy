@@ -1,6 +1,6 @@
 "use client";
 
-import { cn, formatMoney, monthLabel, parseAmount } from "@helper";
+import { cn, formatMoney, monthLabel, parseAmount, SAVINGS_CATEGORY } from "@helper";
 import { budgetActions, useLoadedBudget } from "@store";
 import type { Settings } from "@type";
 import {
@@ -32,14 +32,13 @@ const CURRENCIES = [
 
 const NUMBER_FIELDS = [
   "usualIncome",
-  "openingSavings",
   "cushionMonths",
   "loanRate",
   "loanTermMonths",
 ] as const satisfies (keyof Settings)[];
 
 /** Amounts of money, masked until the eye button shows them. The other fields are months and a rate. */
-const MONEY_FIELDS: readonly (keyof Settings)[] = ["usualIncome", "openingSavings"];
+const MONEY_FIELDS: readonly (keyof Settings)[] = ["usualIncome"];
 
 export function SettingsForm() {
   const t = useTranslations("setup");
@@ -270,6 +269,7 @@ export function CategoriesEditor() {
             <Badge variant="secondary" className="h-9 gap-0 pr-0 pl-3 text-sm">
               {c.name}
               <Button
+                hidden={c.name === SAVINGS_CATEGORY}
                 variant="ghost"
                 size="icon-sm"
                 className="rounded-full"

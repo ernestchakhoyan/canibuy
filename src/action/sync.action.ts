@@ -109,7 +109,6 @@ const validSettings = (s: Settings) =>
   s !== null &&
   text(s.currency, 5) &&
   amount(s.usualIncome) &&
-  amount(s.openingSavings) &&
   amount(s.cushionMonths) &&
   amount(s.loanRate) &&
   Number.isInteger(s.loanTermMonths) &&
@@ -130,11 +129,11 @@ export async function saveSetup(settings: Settings, categories: Category[]) {
   }
   const sheet = await connectedSheet();
   if (!sheet) return false; // nothing written: the caller must not count it as synced
-  const { currency, usualIncome, openingSavings, cushionMonths, loanRate, loanTermMonths, startMonth } = settings;
+  const { currency, usualIncome, cushionMonths, loanRate, loanTermMonths, startMonth } = settings;
   await writeSetup(
     sheet.accessToken,
     sheet.spreadsheetId,
-    { currency, usualIncome, openingSavings, cushionMonths, loanRate, loanTermMonths, startMonth },
+    { currency, usualIncome, cushionMonths, loanRate, loanTermMonths, startMonth },
     categories.map(({ name, monthlyLimit }) => ({ name, monthlyLimit }))
   );
   return true;

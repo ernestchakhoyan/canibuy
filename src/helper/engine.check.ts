@@ -5,28 +5,35 @@ import { periodRange } from "./date";
 import { defaultBudget } from "./default-budget";
 import {
   affordOptions,
+  averageEveryday,
   baseCurrency,
   convertBudget,
   cushion,
+  fundProject,
   loanPayment,
   monthBills,
   monthSummary,
   orderVerdict,
   payChoices,
   paymentSplit,
+  projectFunding,
   projectPartsFor,
   projectPlan,
+  projectRank,
   projectStart,
   projectStarted,
   projectSummary,
   projectsOf,
+  recordSavingsBills,
   repairProjects,
   restoreInstallments,
   savingsAccounts,
   savingsBalance,
+  savingsForecast,
   splitStartedProjects,
   toBase,
   usableSavings,
+  withSavingsCategory,
 } from "./engine";
 import { parseAmount } from "./money";
 import { INITIAL_SYNC_META, mergeFromSheet, SHEET_TABS, tabsToWrite } from "./sheet-sync";
@@ -35,7 +42,6 @@ const budget: Budget = {
   settings: {
     currency: "$",
     usualIncome: 1500,
-    openingSavings: 1000,
     cushionMonths: 1,
     loanRate: 12,
     loanTermMonths: 12,
@@ -69,6 +75,7 @@ const budget: Budget = {
   ],
   orders: [],
   parts: [],
+  savings: [{ id: "s0", name: "Opening", amount: 1000, currency: "USD" }], // savings come from the Savings section
 };
 const today = "2026-11-10"; // November has 30 days
 
@@ -319,6 +326,7 @@ assert.deepEqual(periodRange("month", "2026-02-10"), ["2026-02-01", "2026-02-28"
 // Sheet sync rules: a new device never uploads empty tabs; dirty tabs are written and never overwritten.
 const local = {
   ...budget,
+  savings: [],
   orders: [
     {
       id: "o",
@@ -353,11 +361,14 @@ const merged = mergeFromSheet(local, fromSheet, ["orders"]);
 assert.equal(merged.orders.length, 1); // dirty: kept
 assert.equal(merged.entries.length, 0); // clean: the sheet wins (rows deleted there go away here)
 assert.deepEqual(merged.settings, { ...local.settings, usualIncome: 4000 }); // merged key by key
-assert.deepEqual(merged.categories, [{ name: "Rent", monthlyLimit: 0 }]);
+assert.deepEqual(merged.categories, [
+  { name: "Rent", monthlyLimit: 0 },
+  { name: "Savings", monthlyLimit: 0 }, // built-in: re-added when the sheet lacks it
+]);
 assert.deepEqual(
   mergeFromSheet(local, { ...fromSheet, settings: null, categories: null, personal: null, savings: null }, [])
     .categories,
-  local.categories
+  withSavingsCategory(local).categories
 ); // no block: keep
 assert.equal(mergeFromSheet(local, fromSheet, ["setup"]).settings, local.settings); // dirty: kept
 assert.deepEqual(merged.personal, { ...local.personal, appMode: "dark", amountsHidden: false }); // key by key: locale kept
@@ -371,6 +382,7 @@ const withSavings = {
   ...budget,
   rates,
   savings: [
+    ...(budget.savings ?? []),
     { id: "s1", name: "Cash", amount: 100, currency: "USD" as const },
     { id: "s2", name: "Deposit", amount: 40000, currency: "AMD" as const },
     { id: "s3", name: "Euro", amount: 80, currency: "EUR" as const },
@@ -381,7 +393,7 @@ assert.equal(baseCurrency(withSavings), "USD");
 assert.equal(toBase(withSavings, 40000, "AMD"), 100);
 assert.equal(toBase(withSavings, 100, "USD"), 100); // same currency: no rate needed
 const accounts = savingsAccounts(withSavings);
-assert.equal(accounts.total, 300); // 100 + 100 + 100; GBP left out
+assert.equal(accounts.total, 1300); // 1000 + 100 + 100 + 100; GBP left out
 assert.deepEqual(accounts.unconverted, ["GBP"]);
 assert.equal(savingsBalance(withSavings), savingsBalance(budget) + 300);
 assert.equal(usableSavings(withSavings), usableSavings(budget) + 300); // every calculation sees the converted total
@@ -471,5 +483,171 @@ assert.deepEqual(
   ["lb-1", "2026-12", 204.35, "Planned"]
 );
 assert.equal(restoreInstallments(startedCar), startedCar); // instalments present: untouched
+
+// Priority and funding. 1200 available this month, 600 free a month after. Plan A (3000 in Dec) is ranked ahead
+// of plan B (600 in Dec): B alone fits, but not after A's part.
+const part = (projectId: string, partId: string, cost: number, payMonth: string) => ({
+  projectId,
+  project: projectId,
+  partId,
+  part: partId,
+  cost,
+  payMonth,
+  status: "Planned" as const,
+  paidDate: "",
+});
+const two: Budget = {
+  ...budget,
+  projects: [
+    { id: "A", name: "A" },
+    { id: "B", name: "B" },
+  ],
+  parts: [part("A", "a1", 3000, "2026-12"), part("B", "b1", 600, "2026-12")],
+};
+assert.deepEqual(
+  projectRank(two).map((p) => p.id),
+  ["A", "B"]
+);
+assert.equal(projectPlan({ ...two, parts: [two.parts[1]] }, "B", today).covered, true);
+const planB = projectPlan(two, "B", today);
+assert.equal(planB.covered, false); // A's 3000 is paid first
+assert.equal(planB.ahead, 1);
+assert.equal(projectPlan(two, "A", today).ahead, 0); // B is behind: not counted
+// A started → ranked first even when listed after B.
+assert.deepEqual(
+  projectRank({
+    ...two,
+    projects: [two.projects?.[1], { id: "A", name: "A", startedDate: today }] as Budget["projects"],
+  }).map((p) => p.id),
+  ["A", "B"]
+);
+
+// A: 1200 short in Dec. Save: Nov 1200, Dec 1800, Jan 2400, Feb 3000 → pay in Feb, a 2-month wait (the best).
+const fundA = projectFunding(two, "A", today);
+assert.ok(fundA);
+assert.equal(fundA.month, "2026-12");
+assert.equal(fundA.borrow, 1200);
+assert.deepEqual(fundA.save, { month: "2027-02", wait: 2 });
+assert.equal(fundA.best, "save");
+assert.equal(Math.round(fundA.bank.payment * 100) / 100, 106.62);
+assert.equal(fundA.friend.payment, 100);
+const savedA = fundProject(two, "A", "save", today, String, String);
+assert.equal(savedA.parts.find((p) => p.partId === "a1")?.payMonth, "2027-02");
+assert.equal(projectPlan(savedA, "A", today).covered, true);
+// Bank: the loan pays 1200 of the Dec part; 12 repayments from Jan.
+const bankA = fundProject(
+  two,
+  "A",
+  "bank",
+  today,
+  (i, n) => `Loan ${i}/${n}`,
+  (i) => `l${i}`
+);
+const aParts = bankA.parts.filter((p) => p.projectId === "A");
+assert.equal(aParts[0].cost, 1800);
+assert.equal(aParts.length, 13);
+assert.deepEqual(
+  [aParts[1].part, aParts[1].cost, aParts[1].payMonth, aParts[1].installment],
+  ["Loan 1/12", 106.62, "2027-01", "bank"]
+);
+assert.equal(projectFunding(bankA, "A", today), null); // already financed
+assert.equal(fundProject(bankA, "A", "friend", today, String, String), bankA);
+
+// Savings category: an expense / bill in it comes out of the month and goes into savings (not the cushion).
+const deposit = {
+  id: "b9",
+  name: "Deposit",
+  amount: 100,
+  dueDay: 15,
+  category: "Savings",
+  active: true,
+  startMonth: "2026-10",
+};
+const intoSavings: Budget = recordSavingsBills(
+  {
+    ...budget,
+    bills: [...budget.bills, deposit],
+    entries: [
+      ...budget.entries,
+      {
+        id: "e9",
+        date: "2026-11-02",
+        type: "expense",
+        category: "Savings",
+        amount: 50,
+        note: "",
+        linkId: "",
+        createdAt: "",
+      },
+    ],
+  },
+  today
+);
+// Due on the 15th: October is recorded, November (today is the 10th) not yet.
+assert.deepEqual(
+  intoSavings.entries.filter((e) => e.linkId === "b9").map((e) => e.date),
+  ["2026-10-15"]
+);
+assert.equal(recordSavingsBills(intoSavings, today), intoSavings); // nothing new: no duplicates
+const later = recordSavingsBills(intoSavings, "2026-12-20");
+assert.equal(later.entries.filter((e) => e.linkId === "b9").length, 3); // + Nov 15, Dec 15
+assert.equal(savingsBalance(intoSavings), savingsBalance(budget) + 50 + 100);
+// Deactivating keeps what was already paid in; no new payments are recorded.
+const off = { ...intoSavings, bills: intoSavings.bills.map((x) => (x.id === "b9" ? { ...x, active: false } : x)) };
+assert.equal(savingsBalance(recordSavingsBills(off, "2026-12-20")), savingsBalance(intoSavings));
+assert.equal(monthSummary(intoSavings, today).left, monthSummary(budget, today).left - 50 - 100);
+assert.equal(monthSummary(intoSavings, today).projectedSpend, monthSummary(budget, today).projectedSpend + 50);
+assert.equal(cushion(intoSavings), cushion(budget));
+// Forecast: each month's change = income − bills + Savings bills − spending − project payments, from the month's
+// first day; what's left goes into savings.
+const forecast = savingsForecast(intoSavings, today, 3);
+assert.deepEqual(
+  forecast.map((f) => f.month),
+  ["2026-11", "2026-12", "2027-01"]
+);
+for (const f of forecast) assert.equal(f.change, f.income - f.bills + f.toSavings - f.spending - f.projects);
+// November: 150 spent (50 of it into savings) + 200 more at the daily pace; 550 left covers it.
+assert.deepEqual(
+  [forecast[0].income, forecast[0].bills, forecast[0].toSavings, forecast[0].spending],
+  [1500, 600, 100, 300]
+);
+assert.equal(forecast[0].change, 700);
+// Already put into savings this month (saved 200, Savings expense 50) is part of November's change, not on top.
+assert.equal(forecast[0].balance, savingsBalance(intoSavings) - 200 - 50 + 700);
+assert.equal(forecast[1].change, 1500 - 600 + 100 - averageEveryday(intoSavings, today));
+assert.equal(forecast[1].balance, forecast[0].balance + forecast[1].change);
+// Spent nearly everything: the projection stops at what's left (50), so the month adds just what went into savings.
+const spentAll = {
+  ...intoSavings,
+  entries: [
+    ...intoSavings.entries,
+    {
+      id: "big",
+      date: "2026-11-03",
+      type: "expense" as const,
+      category: "Fun",
+      amount: 500,
+      note: "",
+      linkId: "",
+      createdAt: "",
+    },
+  ],
+};
+const [spentNov] = savingsForecast(spentAll, today, 1);
+assert.equal(spentNov.change, 200 + 50 + 100); // saved + Savings expense + Deposit bill
+assert.equal(spentNov.balance, savingsBalance(spentAll) + 100); // + the Deposit still due this month
+// No past month with expenses: this month's pace (spent so far, extended to the whole month) is the usual spending.
+const fresh = { ...budget, settings: { ...budget.settings, startMonth: "2026-11" } };
+assert.equal(averageEveryday(fresh, today), (100 / 10) * 30); // 100 by the 10th of a 30-day month
+assert.equal(averageEveryday({ ...fresh, entries: [] }, today), 0); // nothing to go on yet
+const endsLoan = {
+  ...budget,
+  bills: [...budget.bills, { ...budget.bills[0], id: "l", amount: 200, endMonth: "2026-12" }],
+};
+const [f0, f1, f2] = savingsForecast(endsLoan, today, 3).map((f) => f.balance);
+assert.equal(f2 - f1 - (f1 - f0), 200); // the 200 bill ends in December: January saves 200 more
+assert.ok(defaultBudget().categories.some((c) => c.name === "Savings"));
+assert.equal(withSavingsCategory(budget).categories.at(-1)?.name, "Savings");
+assert.equal(withSavingsCategory(defaultBudget()).categories.filter((c) => c.name === "Savings").length, 1);
 
 console.log("engine: all checks passed");

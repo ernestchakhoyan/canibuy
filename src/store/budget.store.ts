@@ -16,16 +16,21 @@ import {
   convertBudget,
   currencyOfSymbol,
   defaultBudget,
+  type Funding,
   fromSavings,
+  fundProject,
   INITIAL_SYNC_META,
   type Lender,
   mergeFromSheet,
+  monthOf,
   newId,
   type PaySource,
   paymentSplit,
   projectStarted,
   projectsOf,
+  recordSavingsBills,
   repairProjects,
+  SAVINGS_CATEGORY,
   SHEET_TABS,
   type SheetTab,
   BUDGET_STORAGE_KEY as STORAGE_KEY,
@@ -33,6 +38,7 @@ import {
   setLocaleCookie,
   tabsToWrite,
   todayISO,
+  withSavingsCategory,
 } from "@helper";
 import type { Bill, Budget, Entry, Order, OrderStatus, Personal, Project, ProjectPart, Saving, Settings } from "@type";
 import { useSyncExternalStore } from "react";
@@ -48,7 +54,11 @@ const load = (): Budget => {
     const saved = localStorage.getItem(STORAGE_KEY);
     // Spread over the defaults so budgets saved before a field existed (e.g. `personal`) still load.
     // repairProjects: older started projects get the monthly payments Start creates now.
-    if (saved) return repairProjects({ ...defaultBudget(), ...(JSON.parse(saved) as Budget) }, todayISO());
+    if (saved)
+      return recordSavingsBills(
+        withSavingsCategory(repairProjects({ ...defaultBudget(), ...(JSON.parse(saved) as Budget) }, todayISO())),
+        todayISO()
+      );
   } catch {}
   return defaultBudget();
 };
@@ -172,7 +182,8 @@ const startSession = async () => {
   state = mergeFromSheet(getBudget(), data, readMeta().dirty);
   persist();
   // Older started projects get their monthly payments, written to the sheet so every device has the same parts.
-  const repaired = repairProjects(getBudget(), todayISO());
+  // Savings bills due since the last visit get their payments recorded (after the merge, so they reach the sheet).
+  const repaired = recordSavingsBills(repairProjects(getBudget(), todayISO()), todayISO());
   if (repaired !== getBudget()) update(() => repaired);
   refreshRates(); // the sheet may have brought savings in other currencies
   writeMeta((m) => ({ ...m, uploaded: SHEET_TABS })); // from now on the sheet leads for every tab
@@ -206,6 +217,17 @@ export const useSheetSyncFailed = (tab: SheetTab) =>
 
 /** `null` during server render and hydration; the loaded budget on the client after that. */
 export const useBudget = () => useSyncExternalStore(subscribe, getBudget, () => null);
+
+/**
+ * A bill that just started paying into savings (new, reactivated, or moved to the Savings category) starts this
+ * month, so the months before it, or while it was off, aren't recorded as paid.
+ */
+const savingsFromNow = (bill: Bill, before?: Bill): Bill => {
+  const was = before?.active && before.category === SAVINGS_CATEGORY;
+  if (!bill.active || bill.category !== SAVINGS_CATEGORY || was) return bill;
+  const month = monthOf(todayISO());
+  return { ...bill, startMonth: bill.startMonth && bill.startMonth > month ? bill.startMonth : month };
+};
 
 type NewEntry = Pick<Entry, "type" | "amount"> & Partial<Omit<Entry, "id" | "createdAt">>;
 
@@ -283,9 +305,20 @@ export const budgetActions = {
   updateSettings: (settings: Partial<Settings>) => update((b) => ({ ...b, settings: { ...b.settings, ...settings } })),
   updatePersonal: (personal: Partial<Personal>) => update((b) => ({ ...b, personal: { ...b.personal, ...personal } })),
 
-  addBill: (bill: Omit<Bill, "id">) => update((b) => ({ ...b, bills: [...b.bills, { ...bill, id: newId() }] })),
+  addBill: (bill: Omit<Bill, "id">) =>
+    update((b) =>
+      recordSavingsBills({ ...b, bills: [...b.bills, savingsFromNow({ ...bill, id: newId() })] }, todayISO())
+    ),
   updateBill: (id: string, change: Partial<Bill>) =>
-    update((b) => ({ ...b, bills: b.bills.map((bill) => (bill.id === id ? { ...bill, ...change } : bill)) })),
+    update((b) =>
+      recordSavingsBills(
+        {
+          ...b,
+          bills: b.bills.map((bill) => (bill.id === id ? savingsFromNow({ ...bill, ...change }, bill) : bill)),
+        },
+        todayISO()
+      )
+    ),
   removeBill: (id: string) => update((b) => ({ ...b, bills: b.bills.filter((bill) => bill.id !== id) })),
 
   addCategory: (name: string) =>
@@ -388,6 +421,31 @@ export const budgetActions = {
   movePart: (partId: string, payMonth: string) =>
     update((b) => ({ ...b, parts: b.parts.map((p) => (p.partId === partId ? { ...p, payMonth } : p)) })),
   removePart: (partId: string) => update((b) => ({ ...b, parts: b.parts.filter((p) => p.partId !== partId) })),
+  /** Edits an unpaid part's name, cost and month. */
+  updatePart: (partId: string, change: Pick<ProjectPart, "part" | "cost" | "payMonth">) =>
+    update((b) => ({
+      ...b,
+      parts: b.parts.map((p) => (p.partId === partId && p.status === "Planned" ? { ...p, ...change } : p)),
+    })),
+  /** Pays a plan the chosen way: save up, bank loan or friend (see `fundProject`). */
+  fundProject: (projectId: string, choice: Funding, label: (i: number, n: number) => string) =>
+    update((b) => fundProject(b, projectId, choice, todayISO(), label, newId)),
+  /**
+   * Moves a plan one place up (-1) or down (1) in the priority order, past the next plan that isn't started or
+   * archived (started projects always come first). The order is the projects' row order in the sheet.
+   */
+  moveProject: (projectId: string, by: -1 | 1) =>
+    update((b) => {
+      const all = projectsOf(b);
+      const plan = (p: Project) => !p.archivedDate && !projectStarted(b, p.id);
+      const from = all.findIndex((p) => p.id === projectId);
+      let to = from + by;
+      while (to >= 0 && to < all.length && !plan(all[to])) to += by;
+      if (from < 0 || to < 0 || to >= all.length) return b;
+      const projects = [...all];
+      [projects[from], projects[to]] = [projects[to], projects[from]];
+      return { ...b, projects };
+    }),
 
   /**
    * Starts a project: records today as its start and replaces its instalments with a recurring bill per lender

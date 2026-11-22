@@ -7,6 +7,7 @@ export * from "./stat";
 export * from "./ui/alert";
 export * from "./ui/badge";
 export * from "./ui/button";
+export * from "./ui/chart";
 export * from "./ui/checkbox";
 export * from "./ui/collapsible";
 export * from "./ui/empty";

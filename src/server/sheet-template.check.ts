@@ -77,7 +77,7 @@ for (const [name, column] of [
 assert.equal(valueAt(BILLS, 0, BILL_COLUMNS.length - 1), "project");
 assert.equal(valueAt(0, 0, 3), undefined); // Setup D–I no longer holds bills
 assert.equal(valueAt(0, 0, range("Categories").startColumnIndex), "name");
-assert.equal(valueAt(0, 8, 1), TEMPLATE_VERSION);
+assert.equal(valueAt(0, 7, 1), TEMPLATE_VERSION);
 assert.equal(valueAt(0, 1, 10), "Food"); // default categories written
 assert.equal(range("Personal").startColumnIndex, 13);
 assert.equal(valueAt(0, 1, 13), "app_mode");
@@ -104,7 +104,7 @@ assert.equal(valueAt(MONTH, MONTH_CELL.row, MONTH_CELL.column), "2026-11");
 assert.equal(valueAt(TEMPLATE, MONTH_CELL.row, MONTH_CELL.column), ""); // set when a month tab is copied
 assert.match(String(valueAt(MONTH, 2, 10)), /Bills_start<=K8/); // bills only count in their months
 // start_month is text, so Sheets doesn't turn "2026-11" into a date.
-assert.deepEqual(body.sheets[0].data[0].rowData[7].values[1], {
+assert.deepEqual(body.sheets[0].data[0].rowData[6].values[1], {
   userEnteredValue: { stringValue: defaultBudget().settings.startMonth },
 });
 

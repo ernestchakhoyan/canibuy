@@ -9,5 +9,6 @@ export * from "./personal";
 export * from "./projects";
 export * from "./quick-add";
 export * from "./savings";
+export * from "./savings-forecast";
 export * from "./setup";
 export * from "./start-over";

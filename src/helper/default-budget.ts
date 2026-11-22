@@ -8,7 +8,6 @@ export const defaultBudget = (): Budget => {
     settings: {
       currency: "֏",
       usualIncome: 0,
-      openingSavings: 0,
       cushionMonths: 3,
       loanRate: 14,
       loanTermMonths: 12,
@@ -16,7 +15,7 @@ export const defaultBudget = (): Budget => {
     },
     personal: { appMode: "system", locale: "en", amountsHidden: true },
     bills: [],
-    categories: ["Food", "Transport", "Home", "Utilities", "Health", "Fun", "Other"].map((name) => ({
+    categories: ["Food", "Transport", "Home", "Utilities", "Health", "Fun", "Savings", "Other"].map((name) => ({
       name,
       monthlyLimit: 0,
     })),

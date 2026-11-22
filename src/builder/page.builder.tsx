@@ -15,6 +15,7 @@ import {
   ProjectDetails,
   ProjectList,
   SavingsAccounts,
+  SavingsForecast,
   SavingsForm,
   SavingsOverview,
   SettingsForm,
@@ -74,6 +75,7 @@ const Page = ({ title, children }: { title: PageKey; children: ReactNode }) => (
 export const MonthBuilder = () => (
   <Page title="month">
     <MonthOverview />
+    <SavingsForecast />
     <MonthExpenses />
   </Page>
 );

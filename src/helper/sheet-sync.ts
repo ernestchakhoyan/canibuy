@@ -1,5 +1,5 @@
 import type { Bill, Budget, Category, Entry, Order, Personal, Project, ProjectPart, Saving, Settings } from "@type";
-import { projectsOf } from "./engine";
+import { projectsOf, withSavingsCategory } from "./engine";
 
 // Pure rules of the Google Sheet sync (the store runs them). Kept here so `bun run test` can check them.
 
@@ -59,7 +59,7 @@ export const mergeFromSheet = (b: Budget, data: SheetData, dirty: SheetTab[]): B
     ...(take("entries") && { entries: data.entries }),
     ...(take("setup") && {
       settings: { ...b.settings, ...data.settings }, // key by key: a broken value in the sheet keeps the app's
-      categories: data.categories ?? b.categories,
+      categories: withSavingsCategory({ ...b, categories: data.categories ?? b.categories }).categories,
     }),
     ...(take("personal") && { personal: { ...b.personal, ...data.personal } }),
     ...(take("savings") && { savings: data.savings ?? b.savings }),
