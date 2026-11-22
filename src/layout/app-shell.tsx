@@ -38,7 +38,7 @@ const HEADER_LINKS = [
   { href: "/setup", label: "setup", icon: SettingsIcon },
 ] as const;
 
-const NO_NAV = ["/connect"];
+const NO_NAV = ["/connect", "/privacy", "/terms"];
 
 type Props = { children: ReactNode; quickAdd: ReactNode };
 

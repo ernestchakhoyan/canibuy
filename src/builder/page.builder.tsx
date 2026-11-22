@@ -225,6 +225,17 @@ const ConnectHeadline = async () => {
   );
 };
 
+/** Google's OAuth verification requires the home page to link to the privacy policy. */
+const ConnectLegalLinks = async () => {
+  const t = await getTranslations("connect");
+  return (
+    <nav className="flex justify-center gap-4 text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4">
+      <Link href="/privacy">{t("privacy")}</Link>
+      <Link href="/terms">{t("terms")}</Link>
+    </nav>
+  );
+};
+
 export const ConnectBuilder = () => (
   <Screen>
     <div className="flex flex-1 flex-col justify-center gap-8 py-12">
@@ -236,6 +247,7 @@ export const ConnectBuilder = () => (
         <ConnectStatus />
       </Suspense>
       <ConnectSheet />
+      <ConnectLegalLinks />
     </div>
   </Screen>
 );

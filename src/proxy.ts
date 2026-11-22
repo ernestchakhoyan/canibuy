@@ -5,17 +5,21 @@ import createMiddleware from "next-intl/middleware";
 import { routing } from "./i18n/routing";
 import { auth } from "./server/auth";
 
-// Optimistic routing on the session cookie: anyone without a connected sheet → /connect, the only public page.
+// Optimistic routing on the session cookie: anyone without a connected sheet → /connect (public besides /privacy, /terms).
 // Server actions that touch Google re-check the session themselves. Then next-intl rewrites the request to the
 // hidden /[locale] segment, picked from the NEXT_LOCALE cookie.
 
 const CONNECT = "/connect";
+// Linked from Google's OAuth consent screen: open whether or not a sheet is connected.
+const PUBLIC = ["/privacy", "/terms"];
 const handleI18n = createMiddleware(routing);
 const LOCALE_PREFIX = new RegExp(`^/(${routing.locales.join("|")})(?=/|$)`);
 
 export default auth((req) => {
+  const path = req.nextUrl.pathname.replace(LOCALE_PREFIX, "");
+  if (PUBLIC.includes(path)) return handleI18n(req);
   const connected = Boolean(req.auth?.sheet);
-  const onConnect = req.nextUrl.pathname.replace(LOCALE_PREFIX, "") === CONNECT;
+  const onConnect = path === CONNECT;
   if (connected !== !onConnect) return NextResponse.redirect(new URL(connected ? "/" : CONNECT, req.url));
   return handleI18n(req);
 });

@@ -33,7 +33,9 @@
     "syncFailed": "Couldn't save to your Google Sheet. It's saved on this device."
   },
   "connect": {
-    "headline": "How much can I save this month, and <em>can I afford this?</em>"
+    "headline": "How much can I save this month, and <em>can I afford this?</em>",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service"
   },
   "personal": {
     "title": "Personal",
