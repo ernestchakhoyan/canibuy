@@ -47,6 +47,7 @@ export function PlanTiming({ label, value, timing, onChange, onClear }: Props) {
       </label>
       <NativeSelect
         id={id}
+        className="w-full"
         value={shown ?? ""}
         onChange={(e) => (e.target.value ? onChange(e.target.value) : onClear?.())}
       >
@@ -82,7 +83,7 @@ export function PlanTiming({ label, value, timing, onChange, onClear }: Props) {
       {timing.best ? (
         timing.best !== shown && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary/8 px-3 py-2">
-            <p className="flex min-w-0 flex-1 items-start gap-1.5">
+            <p className="flex min-w-0 flex-1 basis-60 items-start gap-1.5">
               <SparklesIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
               <span>
                 {t(timing.tight ? "suggestTight" : "suggest", {

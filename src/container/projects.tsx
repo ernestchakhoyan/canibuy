@@ -649,7 +649,7 @@ export function ProjectList() {
     <>
       <Tabs defaultValue="all" className="gap-4">
         <div className="flex items-center gap-2">
-          <TabsList className="min-w-0 flex-1 justify-start overflow-x-auto">
+          <TabsList className="min-w-0 flex-1 justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
             {TABS.map((tab) => (
               <TabsTrigger key={tab} value={tab} className="flex-none">
                 {t(`tabs.${tab}`)}
@@ -919,20 +919,24 @@ export function ProjectDetails() {
         {parts.length > 0 && (
           <ul className="divide-y">
             {parts.map((p) => (
-              <li key={p.partId} className="flex flex-wrap items-center justify-between gap-2 py-2">
+              <li
+                key={p.partId}
+                className="flex flex-wrap items-center justify-between gap-x-2 gap-y-3 py-4 first:pt-0 last:pb-0"
+              >
                 {editing === p.partId ? (
                   <EditPart part={p} onDone={() => setEditing(null)} />
                 ) : (
                   <>
-                    <div className="flex flex-col">
+                    <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="text-sm font-medium">{p.part}</span>
                       <span className="text-xs text-muted-foreground tabular-nums">{money(p.cost)}</span>
                     </div>
                     {p.status === "Paid" ? (
                       <Badge variant="outline">{t("card.paidOn", { date: p.paidDate })}</Badge>
                     ) : (
-                      <div className="flex flex-wrap items-center justify-end gap-2">
+                      <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
                         <NativeSelect
+                          className="min-w-0 flex-1 sm:flex-none"
                           aria-label={t("card.paymentMonth", { name: p.part })}
                           value={p.payMonth}
                           onChange={(e) => budgetActions.movePart(p.partId, e.target.value)}

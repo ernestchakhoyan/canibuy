@@ -95,8 +95,9 @@ export function StartOver() {
           className="absolute inset-y-0 left-0 bg-destructive/25 transition-[width] duration-100 ease-linear"
           style={{ width: `${progress * 100}%` }}
         />
-        <RotateCcwIcon data-icon="inline-start" className="relative" />
+        {/* Icon inside the text, so it stays beside the first word when the label wraps. */}
         <span className="relative">
+          <RotateCcwIcon className="mr-1.5 inline align-[-0.15em]" aria-hidden="true" />
           {status === "working"
             ? t("working")
             : status === "holding"

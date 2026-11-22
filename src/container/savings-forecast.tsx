@@ -134,7 +134,12 @@ export function SavingsForecast({ budget, baseline }: Props = {}) {
         <label htmlFor={selectId} className="text-sm text-muted-foreground">
           {t("pick")}
         </label>
-        <NativeSelect id={selectId} value={index} onChange={(e) => setPicked(Number(e.target.value))}>
+        <NativeSelect
+          id={selectId}
+          className="w-full"
+          value={index}
+          onChange={(e) => setPicked(Number(e.target.value))}
+        >
           {data.map((f, i) => (
             <NativeSelectOption key={f.month} value={i}>
               {`${ahead(i)} · ${monthLabel(f.month, locale)}`}
@@ -144,7 +149,7 @@ export function SavingsForecast({ budget, baseline }: Props = {}) {
       </div>
       <div className="flex flex-col gap-1">
         <span className="text-3xl font-semibold tracking-tight tabular-nums">{money(selected.balance)}</span>
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="flex flex-col gap-2 text-sm">
           <Explain
             label={<span className="text-muted-foreground">{t("monthChange")}</span>}
             text={t("explain.monthChange", {
@@ -412,11 +417,17 @@ function Explain({
 }) {
   return (
     <details className={cn("group text-sm", className)}>
-      <summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
-        {label}
-        <InfoIcon className="size-3.5 shrink-0 text-muted-foreground group-open:text-primary" aria-hidden="true" />
+      {/* The value sits in the summary too: a closed <details> hides everything else. */}
+      <summary className="flex cursor-pointer list-none flex-col [&::-webkit-details-marker]:hidden">
+        <span className="flex items-start gap-1">
+          {label}
+          <InfoIcon
+            className="mt-0.5 size-3.5 shrink-0 text-muted-foreground group-open:text-primary"
+            aria-hidden="true"
+          />
+        </span>
+        {children}
       </summary>
-      {children}
       <p className="mt-1 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">{text}</p>
     </details>
   );
